@@ -19,6 +19,13 @@ s5l = { workspace = true }
 tokio-rustls = "0.26.4"
 rustls = "0.23.40"
 webpki-roots = "1.0.7"
+tun = "0.8.11"
+tokio-util = "0.7.18"
+etherparse = "0.20.2"
+netlink-packet-route = "0.31.0"
+netlink-packet-core = "0.8.1"
+netlink-sys = "0.8.8"
+hickory-proto = "0.26.1"
 
 [[bin]]
 name = "s5t"
@@ -26,9 +33,5 @@ path = "src/main.rs"
 test = true
 
 [[test]]
-name = "client_cli"
-path = "../tests/client_cli.rs"
-
-[[test]]
-name = "client_proxy"
-path = "../tests/client_proxy.rs"
+name = "client"
+path = "../tests/client.rs"

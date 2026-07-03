@@ -1,6 +1,6 @@
 use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
-use crate::{prelude::*, socks5::{parse, config::Socks5Config}};
+use crate::{prelude::*, socks5::{parse, config::Config}};
 
 #[derive(Debug, PartialEq)]
 enum Socks5State {
@@ -12,14 +12,14 @@ enum Socks5State {
 
 #[derive(Debug)]
 pub struct Socks5Session {
-    config: Socks5Config,
+    config: Config,
     state: Socks5State,
     client: Option<TcpStream>,
     target: Option<TcpStream>,
 }
 
 impl Socks5Session {
-    pub fn new(config: Socks5Config, client: TcpStream) -> Self {
+    pub fn new(config: Config, client: TcpStream) -> Self {
         Self { config, state: Socks5State::Handshake, client: Some(client), target: None }
     }
 

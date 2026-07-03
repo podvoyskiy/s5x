@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use url::Url;
 use tracing::trace;
 
@@ -63,6 +65,21 @@ pub fn add_xor(xor: Option<u8>, buf: &mut [u8]) -> &[u8] {
     buf
 }
 
+pub const fn increment_octet(ipv4: Ipv4Addr) -> Ipv4Addr {
+    let mut ip_bytes = ipv4.octets();
+    let (new_value, overflow) = ip_bytes[3].overflowing_add(1);
+    ip_bytes[3] = new_value;
+    if overflow {
+        let (new_value, overflow) = ip_bytes[2].overflowing_add(1);
+        ip_bytes[2] = new_value;
+        if overflow {
+            let (new_value, _) = ip_bytes[1].overflowing_add(1);
+            ip_bytes[1] = new_value;
+        }
+    }
+    Ipv4Addr::from_octets(ip_bytes)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -104,5 +121,13 @@ mod test {
     fn test_xor() {
         assert_eq!(add_xor(None, &mut [0x05, 0x01, 0x00]), &[0x05, 0x01, 0x00]);
         assert_eq!(add_xor(Some(0xAA), &mut [0x05, 0x02, 0x00, 0x02]), &[0xAF, 0xA8, 0xAA, 0xA8]);
+    }
+
+    #[test]
+    fn test_increment_octet() {
+        assert_eq!(increment_octet(Ipv4Addr::UNSPECIFIED), Ipv4Addr::new(0, 0, 0, 1));
+        assert_eq!(increment_octet(Ipv4Addr::LOCALHOST), Ipv4Addr::new(127, 0, 0, 2));
+        assert_eq!(increment_octet(Ipv4Addr::new(100, 64, 0, 255)), Ipv4Addr::new(100, 64, 1, 0));
+        assert_eq!(increment_octet(Ipv4Addr::new(100, 64, 255, 255)), Ipv4Addr::new(100, 65, 0, 0));
     }
 }

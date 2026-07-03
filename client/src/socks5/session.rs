@@ -3,16 +3,16 @@ use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 use tokio_rustls::TlsConnector;
 use std::sync::Arc;
 
-use crate::{http::Http, socks5::config::Socks5Config};
+use crate::http::Http;
 use crate::prelude::*;
 
 pub struct Socks5Session {
-    config: Socks5Config,
+    config: Config,
     server: Option<TcpStream>,
 }
 
 impl Socks5Session {
-    pub fn new(config: Socks5Config, server: TcpStream) -> Self {
+    pub fn new(config: Config, server: TcpStream) -> Self {
         Self { config, server: Some(server) }
     }
 

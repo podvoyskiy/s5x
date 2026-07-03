@@ -12,7 +12,7 @@ keywords = ["tun", "socks5", "proxy", "cli"]
 rust-version = "1.95.0"
 
 [workspace.dependencies]
-tokio = { version = "1.52.2", features = ["rt-multi-thread", "macros", "net", "io-util"] }
+tokio = { version = "1.52.2", features = ["rt-multi-thread", "macros", "net", "io-util", "signal"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 

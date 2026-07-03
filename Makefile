@@ -1,5 +1,3 @@
-.PHONY: server server-auth server-xor client client-https client-xor client-proxy test test-server test-client test-lib build
-
 server:
 	cargo run --bin s5x
 
@@ -18,8 +16,10 @@ client-https:
 client-xor:
 	cargo run --bin s5t -- --xor 0xAA --target https://httpbin.org/post --data '{"key":"value"}'
 
-client-proxy:
-	cargo run --bin s5t -- --mode proxy
+client-tun:
+	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
+	sudo setcap cap_net_admin=+ep target/x86_64-unknown-linux-musl/release/s5t
+	RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t --mode tun --address 10.0.0.9
 
 test: test-server test-client test-lib
 
@@ -41,7 +41,7 @@ sx: server-xor
 c: client
 ch: client-https
 cx: client-xor
-cp: client-proxy
+ct: client-tun
 t: test
 ts: test-server
 tc: test-client

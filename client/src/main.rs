@@ -2,27 +2,30 @@
 
 mod prelude;
 mod mode;
+mod config;
 mod socks5;
+mod tun;
 mod http;
 
 use prelude::*;
-use tokio::net::TcpListener;
 use tokio::net::TcpStream;
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::fmt;
 use tracing_subscriber::EnvFilter;
 
-use crate::socks5::{config::Socks5Config, session::Socks5Session};
+use crate::{tun::TunSession, socks5::Socks5Session};
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
     setup_tracing();
 
-    let mut config = Socks5Config::new()?;
+    let mut config = Config::new()?;
     config.validate()?;
 
+    debug!(config = ?config, "client started");
+
     match config.mode {
-        Mode::Cli => {
-            debug!(config = ?config, "socks5 client started");
+        Mode::Socks5 => {
             let stream = TcpStream::connect(config.server).await.map_err(|_| AppError::TargetUnreachable)?;
             let mut session = Socks5Session::new(config, stream);
 
@@ -30,23 +33,19 @@ async fn main() -> Result<(), AppError> {
             session.connect().await?;
             session.send().await
         },
-        Mode::Proxy => {
-            let listener = TcpListener::bind(config.listen).await?;
-            info!(config = ?config, "socks5 client started");
+        Mode::Tun => {
+            let cancel_token = CancellationToken::new();
+            let mut session = TunSession::new(&config, cancel_token.clone())?;
 
-            loop {
-                let (mut client_stream, client_addr) = listener.accept().await?;
-                info!(%client_addr, "new connection");
+            let handle = tokio::task::spawn_blocking(move || {
+                session.run();
+            });
 
-                tokio::spawn(async move {
-                    let mut server_stream = TcpStream::connect(config.server).await.map_err(|_| AppError::TargetUnreachable)?;
-                    tokio::io::copy_bidirectional(&mut client_stream, &mut server_stream).await?;
-                    info!(%client_addr, "connection closed");
-                    Ok::<(), AppError>(())
-                });
-            }
+            tokio::signal::ctrl_c().await?;
+            cancel_token.cancel();
+            let _ = handle.await;
+            Ok(())
         },
-        Mode::_Tun => Err(AppError::Socks5(format!("mode {:?} not yet implemented", config.mode))),
     }
 }
 

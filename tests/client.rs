@@ -6,7 +6,7 @@ mod support;
 fn test_client() {
     let port: u16 = 33336;
     let _server = TestServer::start(port, None, None);
-    let _client = TestClient::start(&format!("127.0.0.1:{port}"), "cli", Some("http://httpbin.org/get"));
+    let _client = TestClient::start(&format!("127.0.0.1:{port}"), "s5", Some("http://httpbin.org/get"));
 }
 
 #[test]
