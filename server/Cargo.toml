@@ -1,0 +1,27 @@
+[package]
+name = "s5x"
+version = "0.1.0"
+description = "socks5 proxy server"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+s5l = { workspace = true }
+
+[[bin]]
+name = "s5x"
+path = "src/main.rs"
+test = true
+
+[[test]]
+name = "server"
+path = "../tests/server.rs"

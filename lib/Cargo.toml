@@ -1,0 +1,15 @@
+[package]
+name = "s5l"
+version = "0.1.0"
+description = "shared library for s5x & s5t crates"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tracing = { workspace = true }
+url = "2.5.8"

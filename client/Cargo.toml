@@ -1,0 +1,34 @@
+[package]
+name = "s5t"
+version = "0.1.0"
+description = "client for s5x crate"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+s5l = { workspace = true }
+tokio-rustls = "0.26.4"
+rustls = "0.23.40"
+webpki-roots = "1.0.7"
+
+[[bin]]
+name = "s5t"
+path = "src/main.rs"
+test = true
+
+[[test]]
+name = "client_cli"
+path = "../tests/client_cli.rs"
+
+[[test]]
+name = "client_proxy"
+path = "../tests/client_proxy.rs"

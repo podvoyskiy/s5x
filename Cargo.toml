@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["server", "client", "lib"]
+
+[workspace.package]
+edition = "2024"
+authors = ["Podvoyskiy Ilya <ilya.podvoyskiy@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/podvoyskiy/s5x"
+readme = "README.md"
+keywords = ["tun", "socks5", "proxy", "cli"]
+rust-version = "1.95.0"
+
+[workspace.dependencies]
+tokio = { version = "1.52.2", features = ["rt-multi-thread", "macros", "net", "io-util"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
+s5l = { path = "lib", version = "0.1.0" }
