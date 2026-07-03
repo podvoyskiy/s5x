@@ -82,7 +82,6 @@ impl TunSession {
                                                             &response, 
                                                             udp.source_port(),
                                                             udp.destination_port(), 
-                                                            fake_ip,
                                                             ipv4.header().source_addr()
                                                         ).unwrap();
 

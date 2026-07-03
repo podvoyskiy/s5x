@@ -167,6 +167,7 @@ impl Routing {
         rule.attributes = vec![
             RuleAttribute::Table(TABLE_ID),
             RuleAttribute::Protocol(RouteProtocol::Kernel),
+            RuleAttribute::Priority(1000),
         ];
         rule
     }

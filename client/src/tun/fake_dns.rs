@@ -22,6 +22,8 @@ impl FakeDns {
     pub fn get_or_create_fake(&mut self, qname: &str) -> Ipv4Addr {
         let domain = qname.trim_end_matches(".");
 
+        //println!("{:?}", domain);
+
         self.domain_to_fake
             .contains_key(domain)
             .then(|| self.domain_to_fake[domain])
@@ -62,7 +64,6 @@ impl FakeDns {
         response: &[u8], 
         src_port: u16, 
         dst_port: u16,
-        fake_ip: Ipv4Addr,
         client_ip: Ipv4Addr,
     ) -> Result<(), AppError> {
         // let ip_header = Ipv4Header::new(
@@ -90,14 +91,17 @@ impl FakeDns {
 
         // dev.send(&packet).map_err(|e| AppError::ModeTun(format!("failed to send packet via TUN: {e}")))?;
 
+            let source_ip = Ipv4Addr::new(127, 0, 0, 53);
+            let source_ip = Ipv4Addr::new(10, 0, 0, 9);
+
         let builder = PacketBuilder::ipv4(
-            fake_ip.octets(), 
+            source_ip.octets(), 
             client_ip.octets(), 
             64
         ).udp(dst_port, src_port);
 
         let mut packet = Vec::with_capacity(builder.size(response.len()));
-        builder.write(&mut packet, response).unwrap(); // Запись IP + UDP + данные
+        builder.write(&mut packet, response).unwrap();
 
         dev.send(&packet)?;
 
