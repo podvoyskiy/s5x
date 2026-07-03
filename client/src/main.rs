@@ -33,7 +33,7 @@ async fn main() -> Result<(), AppError> {
             session.connect().await?;
             session.send().await
         },
-        Mode::Tun => {
+        Mode::Tun2Socks => {
             let cancel_token = CancellationToken::new();
             let mut session = TunSession::new(&config, cancel_token.clone())?;
 
@@ -46,6 +46,7 @@ async fn main() -> Result<(), AppError> {
             let _ = handle.await;
             Ok(())
         },
+        Mode::Tun => Err(AppError::Other(format!("mode {:?} not yet implemented", config.mode))),
     }
 }
 

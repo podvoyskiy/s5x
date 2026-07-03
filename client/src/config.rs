@@ -33,9 +33,10 @@ impl Debug for Config {
                 s.field("use_tls", &self.use_tls);
                 s.field("xor", &self.xor);
             },
-            Mode::Tun => {
+            Mode::Tun2Socks => {
                 s.field("address", &self.address);
             },
+            Mode::Tun => {},
         }
         s.finish()
     }
@@ -129,7 +130,7 @@ impl ConfigTrait for Config {
                     return Err(AppError::Arguments("invalid target: https requires domain name, not IP".into()));
                 }
             }
-            Mode::Tun => {}
+            Mode::Tun2Socks | Mode::Tun => {}
         }
         Ok(())
     }

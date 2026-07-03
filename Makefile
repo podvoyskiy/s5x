@@ -19,7 +19,7 @@ client-xor:
 client-tun:
 	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
 	sudo setcap cap_net_admin=+ep target/x86_64-unknown-linux-musl/release/s5t
-	RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t --mode tun --address 10.0.0.9
+	RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t --mode tun2socks --address 10.0.0.9
 
 test: test-server test-client test-lib
 

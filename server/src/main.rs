@@ -16,7 +16,7 @@ async fn main() -> Result<(), AppError> {
     config.validate()?;
 
     let listener = TcpListener::bind(format!("{}:{}", config.host, config.port)).await
-        .map_err(|_| AppError::Socks5(format!("port {} is busy or cannot be used", config.port)))?;
+        .map_err(|_| AppError::Other(format!("port {} is busy or cannot be used", config.port)))?;
 
     info!(config = ?config, "socks5 started");
 

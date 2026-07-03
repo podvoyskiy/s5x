@@ -41,7 +41,7 @@ impl Socks5Session {
                         },
                     }
                 },
-                Err(e) => return Err(AppError::Socks5(format!("read error: {e}"))),
+                Err(e) => return Err(AppError::Other(format!("read error: {e}"))),
             }
         }
 

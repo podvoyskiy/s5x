@@ -60,12 +60,9 @@ impl TunSession {
                     break;
                 }
                 Ok(size) => {
-                    if size == 0 {
-                        // Нет данных, возможно EOF
-                        continue;
-                    }
+                    if size == 0 { continue; }
 
-                    match SlicedPacket::from_ip(&buf[..size]) { // Используем ТОЛЬКО прочитанные байты!
+                    match SlicedPacket::from_ip(&buf[..size]) {
                         Err(value) => println!("Err {value:?}"),
                         Ok(value) => {
                             match value.transport {
@@ -75,7 +72,7 @@ impl TunSession {
                                             if let Some(query) = dns_msg.queries.first() {
 
                                                 let fake_ip = fake_dns.get_or_create_fake(&query.name.to_string());
-                                                println!("fake ip {fake_ip:?}");
+                                                //println!("fake ip {fake_ip:?}");
 
                                                 if let Some(response) = fake_dns.build_dns_response(&dns_msg, fake_ip) {
 
@@ -97,7 +94,7 @@ impl TunSession {
                                     }
                                 }
                                 Some(TransportSlice::Icmpv4(icmpv4)) => {
-                                    println!("{:?}", icmpv4); //рабоатет ping 100.64.0.2
+                                    println!("{:?}", icmpv4); //ping 100.64.0.2
                                 }
                                 Some(TransportSlice::Tcp(tcp)) => {
                                     if let Some(NetSlice::Ipv4(ipv4)) = value.net {
