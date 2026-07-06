@@ -37,7 +37,7 @@ impl TunSession {
         
         let tun_index: u32 = dev.tun_index().map_err(|e| AppError::ModeTun(format!("{e}")))?.try_into()?;
 
-        let routing = Routing::new(tun_index)?;
+        let routing = Routing::new(config.address, tun_index)?;
         routing.setup()?;
         
         Ok(Self { cancel_token, dev, routing })
@@ -67,6 +67,12 @@ impl TunSession {
                         Ok(value) => {
                             match value.transport {
                                 Some(TransportSlice::Udp(udp)) => {
+
+                                    if udp.destination_port() != 53 {
+                                        continue;
+                                    }
+                                    println!("{:?}", udp.destination_port());
+
                                     if let Ok(dns_msg) = Message::from_vec(udp.payload()) {
                                         if dns_msg.message_type == MessageType::Query {
                                             if let Some(query) = dns_msg.queries.first() {
@@ -85,7 +91,7 @@ impl TunSession {
                                                             ipv4.header().source_addr()
                                                         ).unwrap();
 
-                                                        
+                                                        println!("{:?}", "after");
                                                     }
                                                 }
                                             }
@@ -93,16 +99,15 @@ impl TunSession {
                                     }
                                 }
                                 Some(TransportSlice::Icmpv4(icmpv4)) => {
-                                    println!("{:?}", icmpv4); //ping 100.64.0.2
+                                    //println!("{:?}", icmpv4); //ping 100.64.0.2
                                 }
+                                // В блоке match для TCP
                                 Some(TransportSlice::Tcp(tcp)) => {
                                     if let Some(NetSlice::Ipv4(ipv4)) = value.net {
-                                        if ipv4.header().destination_addr() == Ipv4Addr::new(100, 64, 0, 2) { //curl 100.64.0.2:80
-                                            println!("{:?}", ipv4.header().destination_addr());
-                                            let _ = self.routing.cleanup();
-                                            break;
+                                        // Если это TCP на порт 53
+                                        if tcp.destination_port() == 53 {
+                                            println!("{:?}", "tcp 53");
                                         }
-                                        
                                     }
                                 }
                                 _ => {}

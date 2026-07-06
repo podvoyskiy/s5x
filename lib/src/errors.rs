@@ -21,6 +21,7 @@ pub enum AppError {
     InvalidHttpResponse,
 
     ModeTun(String),
+    Routing(String),
 }
 
 impl Debug for AppError {
@@ -48,6 +49,7 @@ impl Display for AppError {
             AppError::InvalidHttpMethod => "socks5 invalid http method".red(),
             AppError::InvalidHttpResponse => "socks5 invalid http response".red(),
             AppError::ModeTun(err) => format!("tun error | {err}").red(),
+            AppError::Routing(err) => format!("routing error | {err}").red(),
         };
         write!(f, "{message}")
     }

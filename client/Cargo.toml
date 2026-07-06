@@ -26,6 +26,7 @@ netlink-packet-route = "0.31.0"
 netlink-packet-core = "0.8.1"
 netlink-sys = "0.8.8"
 hickory-proto = "0.26.1"
+iptables = "0.6.0"
 
 [[bin]]
 name = "s5t"

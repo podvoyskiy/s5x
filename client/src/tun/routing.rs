@@ -8,7 +8,7 @@ use std::net::Ipv4Addr;
 
 use crate::prelude::*;
 
-const RT_TABLE_LOCAL: u8 = 255; //* /etc/iproute2/rt_tables
+const _RT_TABLE_LOCAL: u8 = 255; //* /etc/iproute2/rt_tables
 const _RT_TABLE_MAIN: u32 = 254;
 const _RT_TABLE_DEFAULT: u32 = 253;
 
@@ -23,17 +23,18 @@ enum Action {
 }
 
 pub struct Routing {
+    tun_address: Ipv4Addr,
     tun_index: u32,
     socket: Socket
 }
 
 impl Routing {
-    pub fn new(tun_index: u32) -> Result<Self, AppError> {
+    pub fn new(tun_address: Ipv4Addr, tun_index: u32) -> Result<Self, AppError> {
         let mut socket = Socket::new(NETLINK_ROUTE)?;
         socket.bind_auto()?;
         socket.connect(&SocketAddr::new(0, 0))?;
 
-        Ok(Self { tun_index, socket })
+        Ok(Self { tun_address, tun_index, socket })
     }
 
     pub fn setup(&self) -> Result<(), AppError> {
@@ -41,7 +42,8 @@ impl Routing {
         self.add_fake_ip_route()?;
 
         self.add_default_rule()?;
-        self.remove_local_rule()
+        self.add_dns_forwarding_rule()
+        //self.remove_local_rule() //TODO probably delete
     }
 
     pub fn cleanup(&self) -> Result<(), AppError> {
@@ -49,55 +51,71 @@ impl Routing {
         self.remove_fake_ip_route()?;
 
         self.remove_default_rule()?;
-        self.add_local_rule()
+        self.remove_dns_forwarding_rule()
+        //self.add_local_rule() //TODO probably delete
     }
 
     fn add_default_route(&self) -> Result<(), AppError> {
         let route = self.default_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Add);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to add default route | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add default route | error: {e}")))
     }
 
     fn add_fake_ip_route(&self) -> Result<(), AppError> {
         let route = self.fake_ip_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Add);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to add fake ip route | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add fake ip route | error: {e}")))
     }
 
     fn add_default_rule(&self) -> Result<(), AppError> {
         let rule = Self::default_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Add);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to add default rule | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add default rule | error: {e}")))
+    }
+
+    fn add_dns_forwarding_rule(&self) -> Result<(), AppError> {
+        let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
+        if ipt.exists("nat", "OUTPUT", &self.dns_forwarding_rule()).unwrap_or(false) {
+            return Ok(());
+        }
+        ipt.append("nat", "OUTPUT", &self.dns_forwarding_rule())
+            .map_err(|e| AppError::Routing(format!("failed to add dns forwarding rule | error: {e}")))
     }
 
     fn add_local_rule(&self) -> Result<(), AppError> {
         let rule = Self::local_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Add);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to add local rule | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add local rule | error: {e}")))
     }
 
     fn remove_default_route(&self) -> Result<(), AppError> {
         let route = self.default_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to remove default route | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove default route | error: {e}")))
     }
 
     fn remove_fake_ip_route(&self) -> Result<(), AppError> {
         let route = self.fake_ip_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to remove fake ip route | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove fake ip route | error: {e}")))
     }
 
     fn remove_default_rule(&self) -> Result<(), AppError> {
         let rule = Self::default_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to remove default rule | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove default rule | error: {e}")))
+    }
+
+    fn remove_dns_forwarding_rule(&self) -> Result<(), AppError> {
+        let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
+        ipt.delete("nat", "OUTPUT", &self.dns_forwarding_rule())
+            .map_err(|e| AppError::Routing(format!("failed to remove dns forwarding rule | error: {e}")))
     }
 
     fn remove_local_rule(&self) -> Result<(), AppError> {
         let rule = Self::local_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::ModeTun(format!("failed to remove local rule | error: {e}")))
+        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove local rule | error: {e}")))
     }
 
     fn send(&self, mut msg: NetlinkMessage<RouteNetlinkMessage>) -> Result<(), AppError> {
@@ -107,16 +125,21 @@ impl Routing {
         
         debug!(msg=?msg.payload);
 
-        self.socket.send(&buf, 0).map_err(|e| AppError::ModeTun(format!("failed to send netlink message | error: {e}")))?;
+        self.socket.send(&buf, 0).map_err(|e| AppError::Routing(format!("failed to send netlink message | error: {e}")))?;
 
         let mut response = vec![0u8; 4096];
         let len = self.socket.recv(&mut response, 0)?;
         if len >= 20 { //16 bytes header + 4 bytes - error_code
             let error_code = i32::from_ne_bytes(response[16..20].try_into()?);
-            if error_code < 0 { return Err(AppError::ModeTun(format!("Routing error | error code: {error_code}"))); }
+            if error_code < 0 { return Err(AppError::Routing(format!("netlink error code: {error_code}"))); }
         }
 
         Ok(())
+    }
+
+    fn dns_forwarding_rule(&self) -> String {
+        //let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
+        format!("-p udp --dport 53 -j DNAT --to-destination {}:53", self.tun_address)
     }
 
     //* default dev tun0 table 12345 proto static
@@ -178,11 +201,11 @@ impl Routing {
         rule.header = RuleHeader {
             family: AddressFamily::Inet,
             action: RuleAction::ToTable,
-            table: RT_TABLE_LOCAL,
+            table: _RT_TABLE_LOCAL,
             ..Default::default()
         };
         rule.attributes = vec![
-            RuleAttribute::Table(u32::from(RT_TABLE_LOCAL)),
+            RuleAttribute::Table(u32::from(_RT_TABLE_LOCAL)),
             RuleAttribute::Priority(0),
             RuleAttribute::Protocol(RouteProtocol::Kernel),
         ];
