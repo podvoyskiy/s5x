@@ -62,12 +62,13 @@ impl TunSession {
                     match SlicedPacket::from_ip(&buf[..size]) {
                         Err(value) => println!("Err {value:?}"),
                         Ok(value) => {
+                            println!("{:?}", value);
                             match value.transport {
                                 Some(TransportSlice::Udp(udp)) => {
 
-                                    if udp.destination_port() != 53 {
-                                        continue;
-                                    }
+                                    // if udp.destination_port() != 53 {
+                                    //     continue;
+                                    // }
                                     println!("{:?}", udp.destination_port());
 
                                     if let Ok(dns_msg) = Message::from_vec(udp.payload()) {
