@@ -1,22 +1,122 @@
 use std::{collections::HashMap, net::Ipv4Addr};
 
-use etherparse::{IpNumber, Ipv4Header, PacketBuilder, UdpHeader};
-use hickory_proto::{op::{Message, MessageType, UpdateMessage}, rr::{RData, Record, rdata::A}};
-use tun::Device;
+use hickory_proto::{op::{Message, MessageType}, rr::{RData, Record, rdata::A}};
+use tokio::net::UdpSocket;
+use tokio_util::sync::CancellationToken;
 
 use crate::{prelude::*, tun::FAKE_IP_POOL};
 
 const FAKE_IP_START: Ipv4Addr = utils::increment_octet(FAKE_IP_POOL);
 
 pub struct FakeDns {
+    cancel_token: CancellationToken,
     _fake_to_real: HashMap<Ipv4Addr, Ipv4Addr>,
     domain_to_fake: HashMap<String, Ipv4Addr>,
     next_fake_ip: Ipv4Addr
 }
 
 impl FakeDns {
-    pub fn new() -> Self {
-        Self { _fake_to_real: HashMap::new(), domain_to_fake: HashMap::new(), next_fake_ip: FAKE_IP_START }
+    pub fn new(cancel_token: CancellationToken) -> Self {
+        Self { cancel_token, _fake_to_real: HashMap::new(), domain_to_fake: HashMap::new(), next_fake_ip: FAKE_IP_START }
+    }
+
+    pub fn build_dns_response(&self, request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> {
+        if let Ok(request) = Message::from_vec(request_data) {
+            let mut response = Message::new(
+                request.id, 
+                MessageType::Response, 
+                request.op_code
+            );
+            response.metadata.authoritative = true;
+            response.metadata.recursion_desired = request.metadata.recursion_desired;
+            response.metadata.recursion_available = true;
+            response.metadata.truncation = false;
+            response.metadata.response_code = hickory_proto::op::ResponseCode::NoError;
+            
+            // Копируем вопросы
+            for query in request.queries {
+                response.add_query(query.clone());
+                
+                // Создаем A запись с фейковым IP
+                let record = Record::from_rdata(
+                    query.name().clone(),
+                    60, // TTL 60 секунд
+                    RData::A(A::from(fake_ip))
+                );
+                response.add_answer(record);
+            }
+            
+            if let Ok(bytes) = response.to_vec() {
+                return Some(bytes);
+            }
+        }
+        
+        None
+    }
+
+    pub async fn run(&mut self) {
+        let socket = match UdpSocket::bind("10.0.0.9:53").await {
+            Ok(s) => {
+                println!("✅ UDP сокет создан на 10.0.0.9:53");
+                s
+            }
+            Err(e) => {
+                eprintln!("❌ Ошибка создания UDP сокета: {}", e);
+                return;
+            }
+        };
+
+        let mut buf = vec![0u8; 65536];
+
+         loop {
+            match socket.recv_from(&mut buf).await {
+                Ok((n, src_addr)) => {
+                    let data = &buf[..n];
+                    
+                    if let Ok(request) = Message::from_vec(data) {
+                        if let Some(query) = request.queries.first() {
+                            let qname = query.name().to_ascii();
+                            let qtype = query.query_type();
+                            let qtype_str = format!("{:?}", qtype);
+                            
+                            let fake_ip = self.get_or_create_fake(&qname);
+                            
+                            println!(
+                                "{} -> {}: {} {} => {}",
+                                src_addr,
+                                "10.0.0.9:53",
+                                qname,
+                                qtype_str,
+                                fake_ip
+                            );
+                            
+                            if let Some(response) = self.build_dns_response(data, fake_ip) {
+                                if let Err(e) = socket.send_to(&response, src_addr).await {
+                                    eprintln!("❌ Ошибка отправки ответа: {}", e);
+                                } else {
+                                    println!("   ↳ Ответ: {} A {}", qname, fake_ip);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("❌ Ошибка UDP: {}", e);
+                    break;
+                }
+            }
+        }
+
+        loop {
+            let _ = socket.recv_from(&mut buf).await;
+
+            println!("{:?}", buf);
+
+            if self.cancel_token.is_cancelled() {
+                break;
+            }
+        }
+    
     }
 
     pub fn get_or_create_fake(&mut self, qname: &str) -> Ipv4Addr {
@@ -36,77 +136,6 @@ impl FakeDns {
                 self.next_fake_ip
             })
     }
-    // TODO https://github.com/JulianSchmid/etherparse add mock for tests
-
-    pub fn build_dns_response(&self, request: &Message, fake_ip: Ipv4Addr) -> Option<Vec<u8>> {
-        let mut response = Message::new(request.id(), MessageType::Response, request.op_code);
-
-        if let Some(query) = request.queries.first() { 
-            response.add_query(query.clone()); 
-
-            let record = Record::from_rdata(
-                query.name().clone(), 
-                60, 
-                RData::A(A::from(fake_ip))
-            );
-
-            response.add_answer(record);
-
-            response.to_vec().ok()
-        } else {
-            None
-        }
-    }
-
-    pub fn send_dns_response(
-        &self, 
-        dev: &Device,
-        response: &[u8], 
-        src_port: u16, 
-        dst_port: u16,
-        client_ip: Ipv4Addr,
-    ) -> Result<(), AppError> {
-        // let ip_header = Ipv4Header::new(
-        //     20 + 8 + response.len() as u16, 
-        //     64,
-        //     IpNumber::UDP, 
-        //     fake_ip.octets(), 
-        //     client_ip.octets(),
-        // ).unwrap();
-
-        // let udp_header = UdpHeader {
-        //     source_port: src_port,
-        //     destination_port: dst_port,
-        //     length: (8 + response.len()) as u16,
-        //     checksum: 0, //https://github.com/JulianSchmid/etherparse/blob/master/etherparse/examples/write_ipv4_udp.rs
-        // };
-
-        // let mut packet = Vec::new();
-
-        // ip_header.write(&mut packet)?;
-
-        // udp_header.write(&mut packet)?;
-
-        // packet.extend_from_slice(response);
-
-        // dev.send(&packet).map_err(|e| AppError::ModeTun(format!("failed to send packet via TUN: {e}")))?;
-
-            let source_ip = Ipv4Addr::new(127, 0, 0, 53);
-            let source_ip = Ipv4Addr::new(10, 0, 0, 9);
-
-        let builder = PacketBuilder::ipv4(
-            source_ip.octets(), 
-            client_ip.octets(), 
-            64
-        ).udp(dst_port, src_port);
-
-        let mut packet = Vec::with_capacity(builder.size(response.len()));
-        builder.write(&mut packet, response).unwrap();
-
-        dev.send(&packet)?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -115,7 +144,7 @@ mod test {
 
     #[test]
     fn test_get_or_create_fake_ip() {
-        let mut fake_dns = FakeDns::new();
+        let mut fake_dns = FakeDns::new(CancellationToken::new());
 
         let fake_ip1 = fake_dns.get_or_create_fake("cloudflare-dns.com.");
         let fake_ip2 = fake_dns.get_or_create_fake("example.org.");

@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::fmt;
 use tracing_subscriber::EnvFilter;
 
+use crate::tun::FakeDns;
 use crate::{tun::TunSession, socks5::Socks5Session};
 
 #[tokio::main]
@@ -36,14 +37,28 @@ async fn main() -> Result<(), AppError> {
         Mode::Tun2Socks => {
             let cancel_token = CancellationToken::new();
             let mut session = TunSession::new(&config, cancel_token.clone())?;
+            let mut fake_dns = FakeDns::new(cancel_token.clone());
 
-            let handle = tokio::task::spawn_blocking(move || {
+            let handle_tun = tokio::task::spawn_blocking(move || {
                 session.run();
+            });
+
+            let handle_dns = tokio::task::spawn_blocking(move || {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    let _ = fake_dns.run().await;
+                });
             });
 
             tokio::signal::ctrl_c().await?;
             cancel_token.cancel();
-            let _ = handle.await;
+
+            if let Err(error) = handle_tun.await {
+                error!(%error, "handle_tun");
+            }
+            if let Err(error) = handle_dns.await {
+                error!(%error, "handle_dns");
+            }
             Ok(())
         },
         Mode::Tun => Err(AppError::Other(format!("mode {:?} not yet implemented", config.mode))),

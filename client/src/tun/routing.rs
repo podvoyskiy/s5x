@@ -43,7 +43,6 @@ impl Routing {
 
         self.add_default_rule()?;
         self.add_dns_forwarding_rule()
-        //self.remove_local_rule() //TODO probably delete
     }
 
     pub fn cleanup(&self) -> Result<(), AppError> {
@@ -52,7 +51,6 @@ impl Routing {
 
         self.remove_default_rule()?;
         self.remove_dns_forwarding_rule()
-        //self.add_local_rule() //TODO probably delete
     }
 
     fn add_default_route(&self) -> Result<(), AppError> {
@@ -82,12 +80,6 @@ impl Routing {
             .map_err(|e| AppError::Routing(format!("failed to add dns forwarding rule | error: {e}")))
     }
 
-    fn add_local_rule(&self) -> Result<(), AppError> {
-        let rule = Self::local_rule();
-        let msg = Self::wrap_rule_to_msg(rule, &Action::Add);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add local rule | error: {e}")))
-    }
-
     fn remove_default_route(&self) -> Result<(), AppError> {
         let route = self.default_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Delete);
@@ -110,12 +102,6 @@ impl Routing {
         let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
         ipt.delete("nat", "OUTPUT", &self.dns_forwarding_rule())
             .map_err(|e| AppError::Routing(format!("failed to remove dns forwarding rule | error: {e}")))
-    }
-
-    fn remove_local_rule(&self) -> Result<(), AppError> {
-        let rule = Self::local_rule();
-        let msg = Self::wrap_rule_to_msg(rule, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove local rule | error: {e}")))
     }
 
     fn send(&self, mut msg: NetlinkMessage<RouteNetlinkMessage>) -> Result<(), AppError> {
@@ -179,6 +165,7 @@ impl Routing {
         route
     }
 
+    //TODO probably delete
     //* from all lookup 12345
     fn default_rule() -> RuleMessage {
         let mut rule = RuleMessage::default();
@@ -196,7 +183,7 @@ impl Routing {
     }
 
     //* 0:	from all lookup local
-    fn local_rule() -> RuleMessage {
+    fn _local_rule() -> RuleMessage {
         let mut rule = RuleMessage::default();
         rule.header = RuleHeader {
             family: AddressFamily::Inet,
