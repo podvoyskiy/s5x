@@ -19,7 +19,7 @@ impl DnsResolver {
         }
     }
 
-    pub fn get_or_create_fake(&mut self, qname: &str) -> Ipv4Addr {
+    pub fn get_or_create_fake_ip(&mut self, qname: &str) -> Ipv4Addr {
         let domain = qname.trim_end_matches('.');
 
         if let Some(ip) = self.domain_to_fake.get(domain) {
@@ -34,7 +34,7 @@ impl DnsResolver {
         }
     }
 
-    pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> { //TODO add tests
+    pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> {
         if let Ok(request) = Message::from_vec(request_data) {
             let mut response = Message::new(
                 request.id, 
@@ -69,20 +69,52 @@ impl DnsResolver {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+use hickory_proto::{op::{OpCode, Query}, rr::{Name, RecordType}};
+
+use super::*;
 
     #[test]
     fn test_get_or_create_fake_ip() {
         let mut fake_dns = DnsResolver::new();
 
-        let fake_ip1 = fake_dns.get_or_create_fake("cloudflare-dns.com.");
-        let fake_ip2 = fake_dns.get_or_create_fake("example.org.");
-        let fake_ip3 = fake_dns.get_or_create_fake("cloudflare-dns.com.");
-        let fake_ip4 = fake_dns.get_or_create_fake("mobile.events.data.microsoft.com.");
+        let fake_ip1 = fake_dns.get_or_create_fake_ip("cloudflare-dns.com.");
+        let fake_ip2 = fake_dns.get_or_create_fake_ip("example.org.");
+        let fake_ip3 = fake_dns.get_or_create_fake_ip("cloudflare-dns.com.");
+        let fake_ip4 = fake_dns.get_or_create_fake_ip("mobile.events.data.microsoft.com.");
 
         assert_eq!(fake_ip1, FAKE_IP_START);
         assert_eq!(fake_ip2, Ipv4Addr::new(100, 64, 0, 2));
         assert_eq!(fake_ip3, FAKE_IP_START);
         assert_eq!(fake_ip4, Ipv4Addr::new(100, 64, 0, 3));
+    }
+
+    #[test]
+    fn test_build_dns_response() {
+        let fake_ip = FAKE_IP_START;
+        let message_id = 123;
+        let domain = "example.com";
+        
+        let mut request = Message::new(message_id, MessageType::Query, OpCode::Query);
+        let query = Query::query(Name::from_ascii(domain).unwrap(), RecordType::A);
+        request.add_query(query);
+        let request_bytes = request.to_vec().unwrap();
+
+        let response = DnsResolver::build_dns_response(&request_bytes, fake_ip);
+
+        assert!(response.is_some());
+
+        let response = Message::from_vec(&response.unwrap()).unwrap();
+        assert_eq!(response.id, message_id);
+        assert_eq!(response.message_type, MessageType::Response);
+        assert!(!response.answers.is_empty());
+        assert_eq!(response.answers.first().unwrap().data.ip_addr().unwrap(), fake_ip);
+    }
+
+    #[test]
+    fn test_build_dns_response_with_invalid_requests() {
+        let fake_ip = FAKE_IP_START;
+        
+        assert!(DnsResolver::build_dns_response(&[], fake_ip).is_none());
+        assert!(DnsResolver::build_dns_response(&[0, 11], fake_ip).is_none()); //min length udp packet - 12 bytes
     }
 }

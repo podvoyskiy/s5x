@@ -18,7 +18,7 @@ pub struct FakeDns {
 
 impl FakeDns {
     pub async fn new(cancel_token: CancellationToken) -> Result<Self, AppError> {
-        match UdpSocket::bind("10.0.0.9:53").await {
+        match UdpSocket::bind("10.0.0.9:53").await { //TODO 10.0.0.9
             Ok(udp_socket) => {
                 Ok(Self { resolver: DnsResolver::new(), udp_socket, cancel_token, _fake_to_real: HashMap::new() })
             }
@@ -44,7 +44,7 @@ impl FakeDns {
                                 let qname = query.name().to_ascii();
                                 let qtype = query.query_type();
                                 
-                                let fake_ip = self.resolver.get_or_create_fake(&qname);
+                                let fake_ip = self.resolver.get_or_create_fake_ip(&qname);
 
                                 trace!("{src_addr} -> 10.0.0.9:53: {qname} {qtype} => {fake_ip}");
 
