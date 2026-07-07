@@ -7,6 +7,8 @@ use tokio_util::sync::CancellationToken;
 use crate::prelude::*;
 use crate::tun::DnsResolver;
 
+const MAX_DNS_UDP_PACKET_SIZE: usize = 65536;
+
 pub struct FakeDns {
     resolver: DnsResolver,
     cancel_token: CancellationToken,
@@ -25,7 +27,7 @@ impl FakeDns {
     }
 
     pub async fn run(&mut self) {
-        let mut buf = vec![0u8; 65536];
+        let mut buf = vec![0u8; MAX_DNS_UDP_PACKET_SIZE];
 
          loop {
             tokio::select! {
@@ -45,28 +47,19 @@ impl FakeDns {
                                     let qtype_str = format!("{:?}", qtype);
                                     
                                     let fake_ip = self.resolver.get_or_create_fake(&qname);
-                                    
-                                    println!(
-                                        "{} -> {}: {} {} => {}",
-                                        src_addr,
-                                        "10.0.0.9:53",
-                                        qname,
-                                        qtype_str,
-                                        fake_ip
-                                    );
-                                    
+
+                                    trace!("{src_addr} -> 10.0.0.9:53: {qname} {qtype_str} => {fake_ip}");
+
                                     if let Some(response) = DnsResolver::build_dns_response(data, fake_ip) {
-                                        if let Err(e) = self.udp_socket.send_to(&response, src_addr).await {
-                                            eprintln!("error response udp : {e}");
-                                        } else {
-                                            println!("  Response: {} A {}", qname, fake_ip);
+                                        if let Err(error) = self.udp_socket.send_to(&response, src_addr).await {
+                                            error!(%error, "failed to send data on the udp socket")
                                         }
                                     }
                                 }
                             }
                         },
-                        Err(e) => {
-                            eprintln!("UDP error: {}", e);
+                        Err(error) => {
+                            error!(%error, "failed to receive message on the udp socket");
                             break;
                         }
                     }

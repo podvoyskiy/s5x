@@ -124,7 +124,6 @@ impl Routing {
     }
 
     fn dns_forwarding_rule(&self) -> String {
-        //let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
         format!("-p udp --dport 53 -j DNAT --to-destination {}:53", self.tun_address)
     }
 

@@ -35,7 +35,7 @@ impl DnsResolver {
             })
     }
 
-    pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> {
+    pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> { //TODO add tests
         if let Ok(request) = Message::from_vec(request_data) {
             let mut response = Message::new(
                 request.id, 
