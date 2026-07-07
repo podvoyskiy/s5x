@@ -20,19 +20,18 @@ impl DnsResolver {
     }
 
     pub fn get_or_create_fake(&mut self, qname: &str) -> Ipv4Addr {
-        let domain = qname.trim_end_matches(".");
+        let domain = qname.trim_end_matches('.');
 
-        self.domain_to_fake
-            .contains_key(domain)
-            .then(|| self.domain_to_fake[domain])
-            .unwrap_or_else(|| {
-                if !self.domain_to_fake.is_empty() {
-                    self.next_fake_ip = utils::increment_octet(self.next_fake_ip);
-                }
+        if let Some(ip) = self.domain_to_fake.get(domain) {
+            *ip
+        } else {
+            if !self.domain_to_fake.is_empty() {
+                self.next_fake_ip = utils::increment_octet(self.next_fake_ip);
+            }
 
-                self.domain_to_fake.insert(domain.to_string(), self.next_fake_ip);
-                self.next_fake_ip
-            })
+            self.domain_to_fake.insert(domain.to_string(), self.next_fake_ip);
+            self.next_fake_ip
+        }
     }
 
     pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> { //TODO add tests

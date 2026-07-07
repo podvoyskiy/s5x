@@ -50,26 +50,26 @@ impl TunSession {
                 break;
             }
 
-            match self.dev.read(&mut buf) {
-                Ok(size) => {
-                    match SlicedPacket::from_ip(&buf[..size]) {
-                        Err(value) => println!("Err {value:?}"),
-                        Ok(value) => {
-                            match value.transport {
-                                Some(TransportSlice::Tcp(_tcp)) => {
-                                    if let Some(NetSlice::Ipv4(ipv4)) = value.net {
-                                        println!("{:?}", ipv4.header().destination_addr());
-                                    }
+            if let Ok(size) = self.dev.read(&mut buf) {
+                match SlicedPacket::from_ip(&buf[..size]) {
+                    Err(value) => println!("Err {value:?}"),
+                    Ok(value) => {
+                        match value.transport {
+                            Some(TransportSlice::Tcp(_tcp)) => {
+                                if let Some(NetSlice::Ipv4(ipv4)) = value.net {
+                                    println!("{:?}", ipv4.header().destination_addr());
                                 }
-                                _ => {}
                             }
+                            Some(TransportSlice::Udp(_udp)) => {}
+                            Some(TransportSlice::Icmpv4(_icmpv4)) => {}
+                            Some(TransportSlice::Icmpv6(_icmpv6)) => {}
+                            None => {},
                         }
                     }
                 }
-                _ => {
-                    let _ = self.routing.cleanup();
-                    break;
-                }
+            } else {
+                let _ = self.routing.cleanup();
+                break;
             }
         }
     }

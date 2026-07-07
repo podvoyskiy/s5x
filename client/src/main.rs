@@ -44,7 +44,7 @@ async fn main() -> Result<(), AppError> {
             });
 
             let handle_dns = tokio::spawn(async move {
-                let _ = fake_dns.run().await;
+                fake_dns.run().await;
             });
 
             tokio::signal::ctrl_c().await?;

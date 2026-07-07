@@ -31,7 +31,7 @@ impl FakeDns {
 
          loop {
             tokio::select! {
-                _ = self.cancel_token.cancelled() => {
+                () = self.cancel_token.cancelled() => {
                     break;
                 }
 
@@ -40,21 +40,17 @@ impl FakeDns {
                         Ok((n, src_addr)) => {
                             let data = &buf[..n];
                     
-                            if let Ok(request) = Message::from_vec(data) {
-                                if let Some(query) = request.queries.first() {
-                                    let qname = query.name().to_ascii();
-                                    let qtype = query.query_type();
-                                    let qtype_str = format!("{:?}", qtype);
-                                    
-                                    let fake_ip = self.resolver.get_or_create_fake(&qname);
+                            if let Ok(request) = Message::from_vec(data) && let Some(query) = request.queries.first() {
+                                let qname = query.name().to_ascii();
+                                let qtype = query.query_type();
+                                
+                                let fake_ip = self.resolver.get_or_create_fake(&qname);
 
-                                    trace!("{src_addr} -> 10.0.0.9:53: {qname} {qtype_str} => {fake_ip}");
+                                trace!("{src_addr} -> 10.0.0.9:53: {qname} {qtype} => {fake_ip}");
 
-                                    if let Some(response) = DnsResolver::build_dns_response(data, fake_ip) {
-                                        if let Err(error) = self.udp_socket.send_to(&response, src_addr).await {
-                                            error!(%error, "failed to send data on the udp socket")
-                                        }
-                                    }
+                                if let Some(response) = DnsResolver::build_dns_response(data, fake_ip)
+                                    && let Err(error) = self.udp_socket.send_to(&response, src_addr).await {
+                                    error!(%error, "failed to send data on the udp socket");
                                 }
                             }
                         },
