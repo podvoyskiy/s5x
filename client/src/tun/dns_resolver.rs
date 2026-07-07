@@ -49,12 +49,7 @@ impl DnsResolver {
             
             for query in request.queries {
                 response.add_query(query.clone());
-                
-                let record = Record::from_rdata(
-                    query.name().clone(),
-                    60,
-                    RData::A(A::from(fake_ip))
-                );
+                let record = Record::from_rdata(query.name().clone(), 60, RData::A(A::from(fake_ip)));
                 response.add_answer(record);
             }
             
