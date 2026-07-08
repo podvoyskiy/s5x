@@ -59,6 +59,8 @@ impl TunSession {
                             Some(TransportSlice::Tcp(_tcp)) => {
                                 if let Some(NetSlice::Ipv4(ipv4)) = value.net {
                                     println!("{:?}", ipv4.header().destination_addr());
+                                    println!("{:?}", self.resolver.is_fake_ip(ipv4.header().destination_addr()));
+                                    println!("{:?}", self.resolver.get_domain_by_fake_ip(ipv4.header().destination_addr()));
                                 }
                             }
                             Some(TransportSlice::Udp(_udp)) => {}

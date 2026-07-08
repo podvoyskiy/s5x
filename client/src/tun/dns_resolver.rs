@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::{collections::HashMap, net::Ipv4Addr, sync::{Arc, Mutex}};
 use hickory_proto::{op::{Message, MessageType}, rr::{RData, Record, rdata::A}};
 
 use crate::prelude::*;
@@ -9,16 +9,16 @@ const FAKE_IP_START: Ipv4Addr = utils::increment_octet(FAKE_IP_POOL);
 
 #[derive(Clone)]
 pub struct DnsResolver {
-    domain_to_fake: HashMap<String, Ipv4Addr>,
-    fake_to_domain: HashMap<Ipv4Addr, String>,
+    domain_to_fake: Arc<Mutex<HashMap<String, Ipv4Addr>>>,
+    fake_to_domain: Arc<Mutex<HashMap<Ipv4Addr, String>>>,
     next_fake_ip: Ipv4Addr
 }
 
 impl DnsResolver {
     pub fn new() -> Self {
         Self {
-            domain_to_fake: HashMap::new(),
-            fake_to_domain: HashMap::new(),
+            domain_to_fake: Arc::new(Mutex::new(HashMap::new())),
+            fake_to_domain: Arc::new(Mutex::new(HashMap::new())),
             next_fake_ip: FAKE_IP_START,
         }
     }
@@ -26,24 +26,25 @@ impl DnsResolver {
     pub fn get_or_create_fake_ip(&mut self, qname: &str) -> Ipv4Addr {
         let domain = qname.trim_end_matches('.');
 
-        if let Some(ip) = self.domain_to_fake.get(domain) {
+        if let Some(ip) = self.domain_to_fake.lock().unwrap().get(domain) {
             *ip
         } else {
-            if !self.domain_to_fake.is_empty() {
+            if !self.domain_to_fake.lock().unwrap().is_empty() {
                 self.next_fake_ip = utils::increment_octet(self.next_fake_ip);
             }
 
-            self.domain_to_fake.insert(domain.to_string(), self.next_fake_ip);
+            self.domain_to_fake.lock().unwrap().insert(domain.to_string(), self.next_fake_ip);
+            self.fake_to_domain.lock().unwrap().insert(self.next_fake_ip, domain.to_string());
             self.next_fake_ip
         }
     }
 
-    pub fn get_domain_by_fake_ip(&self, fake_ip: Ipv4Addr) -> Option<&String> {
-        self.fake_to_domain.get(&fake_ip)
+    pub fn get_domain_by_fake_ip(&self, fake_ip: Ipv4Addr) -> Option<String> {
+        self.fake_to_domain.lock().unwrap().get(&fake_ip).cloned()
     }
 
     pub fn is_fake_ip(&self, ip: Ipv4Addr) -> bool {
-        self.fake_to_domain.contains_key(&ip)
+        self.fake_to_domain.lock().unwrap().contains_key(&ip)
     }
 
     pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> {
