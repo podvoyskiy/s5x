@@ -6,8 +6,11 @@ use crate::tun::FAKE_IP_POOL;
 
 const FAKE_IP_START: Ipv4Addr = utils::increment_octet(FAKE_IP_POOL);
 
+
+#[derive(Clone)]
 pub struct DnsResolver {
     domain_to_fake: HashMap<String, Ipv4Addr>,
+    fake_to_domain: HashMap<Ipv4Addr, String>,
     next_fake_ip: Ipv4Addr
 }
 
@@ -15,6 +18,7 @@ impl DnsResolver {
     pub fn new() -> Self {
         Self {
             domain_to_fake: HashMap::new(),
+            fake_to_domain: HashMap::new(),
             next_fake_ip: FAKE_IP_START,
         }
     }
@@ -32,6 +36,14 @@ impl DnsResolver {
             self.domain_to_fake.insert(domain.to_string(), self.next_fake_ip);
             self.next_fake_ip
         }
+    }
+
+    pub fn get_domain_by_fake_ip(&self, fake_ip: Ipv4Addr) -> Option<&String> {
+        self.fake_to_domain.get(&fake_ip)
+    }
+
+    pub fn is_fake_ip(&self, ip: Ipv4Addr) -> bool {
+        self.fake_to_domain.contains_key(&ip)
     }
 
     pub fn build_dns_response(request_data: &[u8], fake_ip: Ipv4Addr) -> Option<Vec<u8>> {

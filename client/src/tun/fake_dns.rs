@@ -19,11 +19,11 @@ pub struct FakeDns {
 }
 
 impl FakeDns {
-    pub async fn new(config: &Config, cancel_token: CancellationToken) -> Result<Self, AppError> {
+    pub async fn new(config: &Config, resolver: DnsResolver, cancel_token: CancellationToken) -> Result<Self, AppError> {
         match UdpSocket::bind(SocketAddr::from((config.address, 53))).await {
             Ok(udp_socket) => {
                 let udp_socket_addr = udp_socket.local_addr()?;
-                Ok(Self { cancel_token, resolver: DnsResolver::new(), udp_socket, udp_socket_addr, _fake_to_real: HashMap::new() })
+                Ok(Self { cancel_token, resolver, udp_socket, udp_socket_addr, _fake_to_real: HashMap::new() })
             }
             Err(_) => Err(AppError::ModeTun("failed to create udp socket".into()))
         }

@@ -3,16 +3,17 @@ use etherparse::{NetSlice, SlicedPacket, TransportSlice};
 use tokio_util::sync::CancellationToken;
 use tun::{AbstractDevice, Device};
 use crate::prelude::*;
-use crate::tun::Routing;
+use crate::tun::{DnsResolver, Routing};
 
 pub struct TunSession {
+    resolver: DnsResolver,
     cancel_token: CancellationToken,
     dev: Device,
     routing: Routing
 }
 
 impl TunSession {
-    pub fn new(config: &Config, cancel_token: CancellationToken) -> Result<Self, AppError> {
+    pub fn new(config: &Config, resolver: DnsResolver, cancel_token: CancellationToken) -> Result<Self, AppError> {
         let destination = Ipv4Addr::new(
             config.address.octets()[0], 
             config.address.octets()[1], 
@@ -38,7 +39,7 @@ impl TunSession {
         let routing = Routing::new(config.address, tun_index)?;
         routing.setup()?;
         
-        Ok(Self { cancel_token, dev, routing })
+        Ok(Self { resolver, cancel_token, dev, routing })
     }
 
     pub fn run(&mut self) {

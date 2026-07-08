@@ -13,6 +13,7 @@ use tokio_util::sync::CancellationToken;
 use tracing_subscriber::fmt;
 use tracing_subscriber::EnvFilter;
 
+use crate::tun::DnsResolver;
 use crate::tun::FakeDns;
 use crate::{tun::TunSession, socks5::Socks5Session};
 
@@ -36,8 +37,10 @@ async fn main() -> Result<(), AppError> {
         },
         Mode::Tun2Socks => {
             let cancel_token = CancellationToken::new();
-            let mut session = TunSession::new(&config, cancel_token.clone())?;
-            let mut fake_dns = FakeDns::new(&config, cancel_token.clone()).await?;
+            let dns_resolver = DnsResolver::new();
+
+            let mut session = TunSession::new(&config, dns_resolver.clone(), cancel_token.clone())?;
+            let mut fake_dns = FakeDns::new(&config, dns_resolver.clone(), cancel_token.clone()).await?;
 
             let handle_tun = tokio::task::spawn_blocking(move || {
                 session.run();
