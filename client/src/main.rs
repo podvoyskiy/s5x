@@ -37,7 +37,7 @@ async fn main() -> Result<(), AppError> {
         Mode::Tun2Socks => {
             let cancel_token = CancellationToken::new();
             let mut session = TunSession::new(&config, cancel_token.clone())?;
-            let mut fake_dns = FakeDns::new(cancel_token.clone()).await?;
+            let mut fake_dns = FakeDns::new(&config, cancel_token.clone()).await?;
 
             let handle_tun = tokio::task::spawn_blocking(move || {
                 session.run();
@@ -51,10 +51,10 @@ async fn main() -> Result<(), AppError> {
             cancel_token.cancel();
 
             if let Err(error) = handle_tun.await {
-                error!(%error, "handle_tun");
+                error!(%error, "handle tun");
             }
             if let Err(error) = handle_dns.await {
-                error!(%error, "handle_dns");
+                error!(%error, "handle dns");
             }
             Ok(())
         },
