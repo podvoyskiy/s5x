@@ -3,7 +3,8 @@ name: Build Release
 on:
   push:
     tags:
-      - 'v*'
+      - 's5x-v*'
+      - 's5t-v*'
 
 permissions:
   contents: write
@@ -11,9 +12,24 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    env:
+      CRATE: ""
     
     steps:
     - uses: actions/checkout@v4
+
+    - name: Get crate name from tag
+      run: |
+        TAG="${{ github.ref_name }}"
+        if [[ "$TAG" == s5x-v* ]]; then
+          echo "CRATE=s5x" >> $GITHUB_ENV
+        elif [[ "$TAG" == s5t-v* ]]; then
+          echo "CRATE=s5t" >> $GITHUB_ENV
+        fi
+
+    - name: Install musl tools (only for s5t)
+      if: env.CRATE == 's5t'
+      run: sudo apt-get update && sudo apt-get install -y musl-tools
     
     - name: Setup Rust toolchain
       uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -21,13 +37,13 @@ jobs:
         toolchain: 1.95.0
         target: x86_64-unknown-linux-musl
     
-    - name: Build s5x binary
-      run: cargo build --release -p s5x --target x86_64-unknown-linux-musl
+    - name: Build binary
+      run: cargo build --release -p "${{ env.CRATE }}" --target x86_64-unknown-linux-musl
 
     - name: Strip Linux binary
-      run: strip target/x86_64-unknown-linux-musl/release/s5x
+      run: strip "target/x86_64-unknown-linux-musl/release/${{ env.CRATE }}"
 
     - name: Upload Linux binary
       uses: softprops/action-gh-release@v1
       with:
-        files: target/x86_64-unknown-linux-musl/release/s5x
+        files: "target/x86_64-unknown-linux-musl/release/${{ env.CRATE }}"

@@ -43,5 +43,5 @@ curl -x socks5://admin:12345@127.0.0.1:1080 http://httpbin.org/get
 
 ## Other Crates
 
-- `s5t` – multi-mode client (currently: one-time SOCKS5 request to server; planned: TUN via SOCKS5, TUN with native protocol) – work in progress
+- `s5t` – client (currently: one-time SOCKS5 request to server, planned: TUN via SOCKS5, TUN with native protocol) – work in progress
 - `s5l` – shared library
