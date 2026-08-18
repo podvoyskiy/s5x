@@ -1,7 +1,7 @@
 [package]
 name = "s5t"
-version = "0.1.0"
-description = "client for s5x crate"
+version = "0.2.0"
+description = "SOCKS5 client with tun2socks and one-time request modes"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -16,9 +16,30 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 s5l = { workspace = true }
+
+tokio-util = "0.7.18"
+
+# TLS support for HTTPS
 tokio-rustls = "0.26.4"
 rustls = "0.23.40"
 webpki-roots = "1.0.7"
+
+# TUN device
+tun = { version = "0.8.11", features = ["async"] }
+
+# Routing (Linux)
+netlink-packet-route = "0.31.0"
+netlink-packet-core = "0.8.1"
+netlink-sys = "0.8.8"
+iptables = "0.6.0"
+
+# DNS
+hickory-proto = "0.26.1"
+
+# Network stack (tun2socks)
+netstack-smoltcp = "0.2.4"
+futures-util = "0.3.34"
+default-net = "0.22.0"
 
 [[bin]]
 name = "s5t"
@@ -26,9 +47,5 @@ path = "src/main.rs"
 test = true
 
 [[test]]
-name = "client_cli"
-path = "../tests/client_cli.rs"
-
-[[test]]
-name = "client_proxy"
-path = "../tests/client_proxy.rs"
+name = "client"
+path = "../tests/client.rs"

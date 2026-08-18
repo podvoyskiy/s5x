@@ -1,14 +1,44 @@
-.PHONY: server server-auth server-xor client client-https client-xor client-proxy test test-server test-client test-lib build
+.PHONY: \
+	server \
+	server-auth \
+	server-xor \
+	client \
+	client-https \
+	client-xor \
+	client-tun \
+	client-tun-debug \
+	clean-routes \
+	test \
+	test-server \
+	test-client \
+	test-lib \
+	build
 
+-include .env
+
+#variables for client with tun2socks mode & `clean-routes` commands
+SERVER ?= 127.0.0.1:1080
+XOR ?= 0xAA
+AUTH ?= admin:12345
+
+TUN_DEV ?= tun0
+TUN_ADDRESS ?= 10.0.0.9
+GATEWAY ?= $(shell ip route | grep default | awk '{print $$3}' | head -1)
+INTERFACE ?= $(shell ip route | grep default | awk '{print $$5}' | head -1)
+
+TUN_FLAGS = --mode tun2socks --address $(TUN_ADDRESS) --xor $(XOR) --auth $(AUTH) --server $(SERVER)
+
+# ---------- Server ----------
 server:
 	cargo run --bin s5x
 
 server-auth:
-	cargo run --bin s5x -- --auth admin:12345
+	cargo run --bin s5x -- --auth $(AUTH)
 
 server-xor:
-	cargo run --bin s5x -- --xor 0xAA
+	cargo run --bin s5x -- --xor $(XOR)
 
+# ---------- Client with mode socks5 ----------
 client:
 	cargo run --bin s5t -- --target http://34.234.10.121/get?key=value
 
@@ -16,34 +46,93 @@ client-https:
 	cargo run --bin s5t -- --target https://httpbin.org/post --data '{"key":"value"}'
 
 client-xor:
-	cargo run --bin s5t -- --xor 0xAA --target https://httpbin.org/post --data '{"key":"value"}'
+	cargo run --bin s5t -- --xor $(XOR) --target https://httpbin.org/post --data '{"key":"value"}'
 
-client-proxy:
-	cargo run --bin s5t -- --mode proxy
+# ---------- Client with mode tun2socks ----------
+client-tun:
+	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
+	sudo target/x86_64-unknown-linux-musl/release/s5t $(TUN_FLAGS)
 
+client-tun-debug:
+	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
+	sudo -E env RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t $(TUN_FLAGS)
+
+# ---------- TUN Routes Management ----------
+# Emergency cleanup if something went wrong
+# Use this if program crashed and left routes/rules behind
+clean-routes:
+	@echo "Cleaning up routes and rules..."
+	-sudo ip link del $(TUN_DEV) 2>/dev/null || true
+	-sudo ip rule del table 12345 2>/dev/null || true
+	-sudo ip route del $(SERVER)/32 via $(GATEWAY) dev $(INTERFACE) 2>/dev/null || true
+	-sudo ip rule del to $(SERVER) lookup main priority 999 2>/dev/null || true
+	-sudo iptables -t nat -D OUTPUT -p udp --dport 53 -j DNAT --to-destination $(TUN_ADDRESS):53 2>/dev/null || true
+	@echo "Cleanup completed"
+
+# ---------- Testing ----------
 test: test-server test-client test-lib
 
 test-server:
-	cargo test -p s5x
+	cargo test -p s5x -- --nocapture
 
 test-client:
-	cargo test -p s5t
+	cargo test -p s5t -- --nocapture
 
 test-lib:
-	cargo test -p s5l
+	cargo test -p s5l -- --nocapture
 
+# ---------- Build ----------
 build:
 	cargo build --release --target x86_64-unknown-linux-musl
 
-s: server
-sa: server-auth
-sx: server-xor
-c: client
-ch: client-https
-cx: client-xor
-cp: client-proxy
-t: test
-ts: test-server
-tc: test-client
-tl: test-lib
-b: build
+# ---------- Aliases ----------
+s:   server
+sa:  server-auth
+sx:  server-xor
+c:   client
+ch:  client-https
+cx:  client-xor
+ct:  client-tun
+ctd: client-tun-debug
+cr:  clean-routes
+t:   test
+ts:  test-server
+tc:  test-client
+tl:  test-lib
+b:   build
+h:   help
+
+# ---------- Help ----------
+help:
+	@echo "Available targets:"
+	@echo ""
+	@echo "Server:"
+	@echo "  server (s)             - Run server"
+	@echo "  server-auth (sa)       - Run server with auth"
+	@echo "  server-xor (sx)        - Run server with XOR"
+	@echo ""
+	@echo "Client:"
+	@echo "  client (c)             - One-time request (HTTP)"
+	@echo "  client-https (ch)      - One-time request (HTTPS)"
+	@echo "  client-xor (cx)        - One-time request with XOR"
+	@echo "  client-tun (ct)        - Run client with mode 'tun2socks'"
+	@echo "  client-tun-debug (ctd) - Run client with trace log"
+	@echo ""
+	@echo "TUN routes management:"
+	@echo "  clean-routes (cr)      - Emergency cleanup of routes and rules"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test (t)               - Run all tests"
+	@echo "  test-server (ts)       - Test server"
+	@echo "  test-client (tc)       - Test client"
+	@echo "  test-lib (tl)          - Test library"
+	@echo ""
+	@echo "Build:"
+	@echo "  build (b)              - Build release binary"
+	@echo ""
+	@echo ".env variables or defaults (used only for client-tun* and clean-routes):"
+	@echo "  SERVER      = $(SERVER)"
+	@echo "  XOR         = $(XOR)"
+	@echo "  AUTH        = $(AUTH)"
+	@echo "  TUN_ADDRESS = $(TUN_ADDRESS)"
+	@echo "  TUN_DEV     = $(TUN_DEV)"

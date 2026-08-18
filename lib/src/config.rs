@@ -2,7 +2,7 @@ use std::env::args;
 
 use crate::{AppError, utils};
 
-pub trait Config: Default + Sized {
+pub trait ConfigTrait: Default + Sized {
     fn new() -> Result<Self, AppError> {
         Self::from_args(args())
     }

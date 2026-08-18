@@ -6,13 +6,13 @@ mod prelude;
 use prelude::*;
 use tokio::net::TcpListener;
 use tracing_subscriber::fmt;
-use crate::socks5::{config::Socks5Config, session::Socks5Session};
+use crate::socks5::{config::Config, session::Socks5Session};
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
     setup_tracing();
 
-    let mut config = Socks5Config::new()?;
+    let mut config = Config::new()?;
     config.validate()?;
 
     let listener = TcpListener::bind(format!("{}:{}", config.host, config.port)).await

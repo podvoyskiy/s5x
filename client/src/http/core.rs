@@ -4,7 +4,7 @@ use std::fmt::Write;
 use crate::prelude::*;
 use crate::http::Method;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Http {
     pub method: Method,
     pub path: String,

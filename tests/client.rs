@@ -3,17 +3,10 @@ use crate::support::{test_client::TestClient, test_server::TestServer};
 mod support;
 
 #[test]
-fn test_client() {
-    let port: u16 = 33336;
-    let _server = TestServer::start(port, None, None);
-    let _client = TestClient::start(&format!("127.0.0.1:{port}"), "cli", Some("http://httpbin.org/get"));
-}
-
-#[test]
 fn test_http() {
     let port: u16 = 33337;
     let _server = TestServer::start(port, None, None);
-    let output = TestClient::run(
+    let output = TestClient::start(
         &format!("127.0.0.1:{port}"), 
         "http://httpbin.org/post", 
         None,
@@ -31,7 +24,7 @@ fn test_http() {
 fn test_https() {
     let port: u16 = 33338;
     let _server = TestServer::start(port, None, None);
-    let output = TestClient::run(
+    let output = TestClient::start(
         &format!("127.0.0.1:{port}"), 
         "https://httpbin.org/post", 
         None,
@@ -54,7 +47,7 @@ fn test_xor() {
     let xor = 0xAA;
 
     let _server = TestServer::start(port, Some((username.clone(), password.clone())), Some(xor));
-    let output = TestClient::run(
+    let output = TestClient::start(
         &format!("127.0.0.1:{port}"), 
         "https://httpbin.org/get", 
         Some((username.clone(), password.clone())),

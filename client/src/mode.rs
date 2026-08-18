@@ -1,10 +1,10 @@
 use crate::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Mode {
-    Cli,
-    Proxy,
-    _Tun,
+    Socks5,
+    Tun2Socks,
+    Tun,
 }
 
 impl TryFrom<&str> for Mode {
@@ -12,10 +12,10 @@ impl TryFrom<&str> for Mode {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "cli" => Ok(Self::Cli),
-            "proxy" => Ok(Self::Proxy),
-            "tun" => Err(AppError::Socks5(format!("mode {value} not yet implemented"))),
-            _ => Err(AppError::Socks5("invalid mode".into()))
+            "socks5" | "s5" => Ok(Self::Socks5),
+            "tun2socks" | "s5t" => Ok(Self::Tun2Socks),
+            "tun" | "t" => Ok(Self::Tun),
+            _ => Err(AppError::Arguments("invalid mode".into()))
         }
     }
 }

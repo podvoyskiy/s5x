@@ -3,7 +3,7 @@
 use std::{fmt::Display, str::FromStr};
 use crate::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Method {
     GET,
     POST,

@@ -4,7 +4,7 @@ use tracing::debug;
 
 use crate::{AppError, consts, utils};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Atyp {
     Domain((String, u16)),
     Ipv4(SocketAddrV4),
@@ -14,9 +14,9 @@ pub enum Atyp {
 impl Atyp {
     pub fn as_u8(&self) -> u8 {
         match self {
-            Atyp::Domain(_) => consts::connect::ATYP_DOMAINNAME,
-            Atyp::Ipv4(_) => consts::connect::ATYP_IPV4,
-            Atyp::Ipv6(_) => consts::connect::ATYP_IPV6,
+            Atyp::Domain(_) => consts::s5::connect::ATYP_DOMAINNAME,
+            Atyp::Ipv4(_) => consts::s5::connect::ATYP_IPV4,
+            Atyp::Ipv6(_) => consts::s5::connect::ATYP_IPV6,
         }
     }
 
@@ -90,7 +90,7 @@ impl Atyp {
         let atyp = buf.remove(0);
 
         match atyp {
-            consts::connect::ATYP_DOMAINNAME => {
+            consts::s5::connect::ATYP_DOMAINNAME => {
                 // 1 byte is domain length, followed by the domain, then 2 bytes for the port
                 let domain_len = *buf.first().ok_or(AppError::InvalidDomain)? as usize;
                 let domain_bytes = buf.get(1..1 + domain_len).ok_or(AppError::InvalidDomain)?;
@@ -103,14 +103,14 @@ impl Atyp {
 
                 Ok(Self::Domain((domain.to_string(), port)))
             },
-            consts::connect::ATYP_IPV4 => {
+            consts::s5::connect::ATYP_IPV4 => {
                 if buf.len() != 6 { return Err(AppError::InvalidIpv4); }
 
                 let ip = Ipv4Addr::new(buf[0], buf[1], buf[2], buf[3]);
                 let port = u16::from_be_bytes([buf[4], buf[5]]);
                 Ok(Self::Ipv4(SocketAddrV4::new(ip, port)))
             },
-            consts::connect::ATYP_IPV6 => {
+            consts::s5::connect::ATYP_IPV6 => {
                 if buf.len() != 18 { return Err(AppError::InvalidIpv6); }
 
                 let ip_bytes: [u8; 16] = buf[0..16].try_into().map_err(|_| AppError::InvalidIpv6)?;
@@ -146,6 +146,7 @@ mod test {
 
     #[test]
     fn test_from_str() {
+        assert!(Atyp::from_str("api.telegram.org:443").is_ok());
         assert!(Atyp::from_str("127.0.0.1:80").is_ok());
         assert!(Atyp::from_str("[2001:4860:4860::8888]:53").is_ok());
         assert!(Atyp::from_str("https://example.com").is_ok());
@@ -158,7 +159,7 @@ mod test {
     #[test]
     fn test_from_bytes_ipv4() {
         // IPv4: 8.8.8.8:53 (Google DNS)
-        let buf = &[consts::connect::ATYP_IPV4, 0x08, 0x08, 0x08, 0x08, 0x00, 0x35];
+        let buf = &[consts::s5::connect::ATYP_IPV4, 0x08, 0x08, 0x08, 0x08, 0x00, 0x35];
         assert!(Atyp::from_bytes(buf.to_vec()).is_ok());
     }
 
@@ -166,7 +167,7 @@ mod test {
     fn test_from_bytes_ipv6() {
         // IPv6: 2001:4860:4860::8888:53 (Google DNS)
         let buf = &[
-            consts::connect::ATYP_IPV6,
+            consts::s5::connect::ATYP_IPV6,
             0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x88, 
             0x00, 0x35
@@ -177,7 +178,7 @@ mod test {
     #[test]
     fn test_from_bytes_domain_name() {
         let buf = &[
-            consts::connect::ATYP_DOMAINNAME,
+            consts::s5::connect::ATYP_DOMAINNAME,
             0x0a, // domain length: 10 bytes
             b'g', b'o', b'o', b'g', b'l', b'e', b'.', b'c', b'o', b'm', // google.com
             0x01, 0xbb // port: 443

@@ -11,4 +11,4 @@ pub mod config;
 
 pub use errors::AppError;
 pub use atyp::Atyp;
-pub use config::Config;
+pub use config::ConfigTrait;

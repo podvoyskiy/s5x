@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use url::Url;
 use tracing::trace;
 
@@ -24,20 +26,24 @@ where
 }
 
 pub fn parse_url(target: &str) -> Result<(String, u16), AppError> {
-    let url = Url::parse(target).map_err(|_| AppError::InvalidDomain)?;
 
-    let host = url.host_str().ok_or(AppError::InvalidDomain)?.to_string();
+    if let Ok(url) = Url::parse(target) && let Some(host) = url.host_str() {
+        let port = match url.port() {
+            Some(p) => p,
+            None => match url.scheme() {
+                "https" => 443,
+                "http" => 80,
+                _ => return Err(AppError::InvalidDomain),
+            },
+        };
+        return Ok((host.to_string(), port));
+    }
 
-    let port = match url.port() {
-        Some(p) => p,
-        None => match url.scheme() {
-            "https" => 443,
-            "http" => 80,
-            _ => return Err(AppError::InvalidDomain),
-        },
-    };
+    if let Some((host, port_str)) = target.split_once(':') && let Ok(port) = port_str.parse::<u16>() {
+        return Ok((host.to_string(), port));
+    }
 
-    Ok((host, port))
+    Err(AppError::InvalidDomain)
 }
 
 pub fn extract_path(url: &str) -> String {
@@ -61,6 +67,21 @@ pub fn add_xor(xor: Option<u8>, buf: &mut [u8]) -> &[u8] {
         for b in buf.iter_mut() { *b ^= xor; }
     }
     buf
+}
+
+pub const fn increment_octet(ipv4: Ipv4Addr) -> Ipv4Addr {
+    let mut ip_bytes = ipv4.octets();
+    let (new_value, overflow) = ip_bytes[3].overflowing_add(1);
+    ip_bytes[3] = new_value;
+    if overflow {
+        let (new_value, overflow) = ip_bytes[2].overflowing_add(1);
+        ip_bytes[2] = new_value;
+        if overflow {
+            let (new_value, _) = ip_bytes[1].overflowing_add(1);
+            ip_bytes[1] = new_value;
+        }
+    }
+    Ipv4Addr::from_octets(ip_bytes)
 }
 
 #[cfg(test)]
@@ -90,6 +111,10 @@ mod test {
         let (host, port) = parse_url("https://example.com/path").unwrap();
         assert_eq!(host, String::from("example.com"));
         assert_eq!(port, 443);
+
+        let (host, port) = parse_url("detectportal.firefox.com:80").unwrap();
+        assert_eq!(host, String::from("detectportal.firefox.com"));
+        assert_eq!(port, 80);
     }
 
     #[test]
@@ -104,5 +129,13 @@ mod test {
     fn test_xor() {
         assert_eq!(add_xor(None, &mut [0x05, 0x01, 0x00]), &[0x05, 0x01, 0x00]);
         assert_eq!(add_xor(Some(0xAA), &mut [0x05, 0x02, 0x00, 0x02]), &[0xAF, 0xA8, 0xAA, 0xA8]);
+    }
+
+    #[test]
+    fn test_increment_octet() {
+        assert_eq!(increment_octet(Ipv4Addr::UNSPECIFIED), Ipv4Addr::new(0, 0, 0, 1));
+        assert_eq!(increment_octet(Ipv4Addr::LOCALHOST), Ipv4Addr::new(127, 0, 0, 2));
+        assert_eq!(increment_octet(Ipv4Addr::new(100, 64, 0, 255)), Ipv4Addr::new(100, 64, 1, 0));
+        assert_eq!(increment_octet(Ipv4Addr::new(100, 64, 255, 255)), Ipv4Addr::new(100, 65, 0, 0));
     }
 }
