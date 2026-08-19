@@ -109,6 +109,7 @@ s5t --target https://httpbin.org/get --headers "User-Agent:curl/8.5.0" --headers
 # With custom method
 s5t --target https://httpbin.org/delete --method DELETE
 ```
+> **Note:** If using prebuilt binary, replace `s5t` with `./s5t`
 
 -  #### tun2socks Mode
 
@@ -119,7 +120,8 @@ sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080
 # With authentication and XOR obfuscation
 sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080 --auth admin:12345 --xor 0xAA
 ```
-> **Note:** If using prebuilt binary, replace `s5t` with `./s5t`
+> **Note:** If you installed via `cargo install`, `sudo` may not see the binary.  
+> Use the full path: `sudo ~/.cargo/bin/s5t ...`
 
 ### Options
 
@@ -140,7 +142,7 @@ sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080 --auth admi
 1. Creates a TUN interface with the specified IP
 2. Sets up routing rules to forward all traffic through the TUN
 3. Intercepts DNS requests and returns fake IPs
-4. Forwards **TCP** traffic through the SOCKS5 proxy
+4. Forwards TCP traffic through the SOCKS5 proxy
 5. Cleanup is automatic on exit (Ctrl+C)
 
 > **Note:** client requires `sudo` to create the TUN interface and modify routing tables
