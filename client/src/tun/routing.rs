@@ -1,11 +1,9 @@
-use default_net::get_default_gateway;
-use default_net::interface::get_default_interface_index;
 use netlink_packet_core::{NLM_F_ACK, NLM_F_CREATE, NLM_F_EXCL, NLM_F_REQUEST, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::route::{RouteAttribute, RouteHeader, RouteMessage, RouteProtocol, RouteAddress, RouteScope, RouteType};
 use netlink_packet_route::rule::{RuleAction, RuleAttribute, RuleHeader, RuleMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use netlink_sys::{Socket, SocketAddr, protocols::NETLINK_ROUTE};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::Ipv4Addr;
 
 use crate::prelude::*;
 
@@ -15,9 +13,6 @@ const _RT_TABLE_DEFAULT: u32 = 253;
 
 const TABLE_ID: u32 = 12345;
 const PRIORITY: u32 = 1000;
-
-pub const FAKE_IP_POOL: Ipv4Addr = Ipv4Addr::new(100, 64, 0, 0);
-const FAKE_IP_PREFIX: u8 = 10;
 
 enum Action {
     Add,
@@ -29,8 +24,6 @@ pub struct Routing {
     server_address: Ipv4Addr,
     tun_index: u32,
     socket: Socket,
-    default_gateway_ip: Ipv4Addr,
-    default_interface_index: u32,
 }
 
 impl Routing {
@@ -39,63 +32,34 @@ impl Routing {
         socket.bind_auto()?;
         socket.connect(&SocketAddr::new(0, 0))?;
 
-        let default_gateway_ip = match get_default_gateway()
-            .map_err(|e| AppError::Routing(format!("failed to get default gateway | error: {e}")))?
-            .ip_addr
-            {
-                IpAddr::V4(ipv4) => ipv4,
-                IpAddr::V6(_) => return Err(AppError::Routing("IPv6 gateway not supported".to_string())),
-            };
-
-        let default_interface_index = get_default_interface_index()
-            .ok_or_else(|| AppError::Routing("failed to get default interface".into()))?;
-
         Ok(Self { 
             tun_address: config.address, 
             server_address: *config.server.ip(), 
             tun_index, 
-            socket, 
-            default_gateway_ip,
-            default_interface_index
+            socket
         })
     }
 
     pub fn setup(&self) -> Result<(), AppError> {
         self.add_default_route()?;
-        self.add_fake_ip_route()?;
-        self.add_socks5_route()?;
 
         self.add_default_rule()?;
-        self.add_dns_forwarding_rule()?;
-        self.add_socks5_rule()
+        self.add_socks5_rule()?;
+        self.add_dns_forwarding_rule()
     }
 
     pub fn cleanup(&self) -> Result<(), AppError> {
         self.remove_default_route()?;
-        self.remove_fake_ip_route()?;
-        self.remove_socks5_route()?;
 
         self.remove_default_rule()?;
-        self.remove_dns_forwarding_rule()?;
-        self.remove_socks5_rule()
+        self.remove_socks5_rule()?;
+        self.remove_dns_forwarding_rule()
     }
 
     fn add_default_route(&self) -> Result<(), AppError> {
         let route = self.default_route();
         let msg = Self::wrap_route_to_msg(route, &Action::Add);
         self.send(msg).map_err(|e| AppError::Routing(format!("failed to add default route | error: {e}")))
-    }
-
-    fn add_fake_ip_route(&self) -> Result<(), AppError> {
-        let route = self.fake_ip_route();
-        let msg = Self::wrap_route_to_msg(route, &Action::Add);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add fake ip route | error: {e}")))
-    }
-
-    fn add_socks5_route(&self) -> Result<(), AppError> {
-        let route = self.socks5_route();
-        let msg = Self::wrap_route_to_msg(route, &Action::Add);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to add socks5 route | error: {e}")))
     }
 
     fn add_default_rule(&self) -> Result<(), AppError> {
@@ -125,34 +89,25 @@ impl Routing {
         self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove default route | error: {e}")))
     }
 
-    fn remove_fake_ip_route(&self) -> Result<(), AppError> {
-        let route = self.fake_ip_route();
-        let msg = Self::wrap_route_to_msg(route, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove fake ip route | error: {e}")))
-    }
-
-    fn remove_socks5_route(&self) -> Result<(), AppError> {
-        let route = self.socks5_route();
-        let msg = Self::wrap_route_to_msg(route, &Action::Delete);
-        self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove socks5 route | error: {e}")))
-    }
-
     fn remove_default_rule(&self) -> Result<(), AppError> {
         let rule = Self::default_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Delete);
         self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove default rule | error: {e}")))
     }
 
-    fn remove_dns_forwarding_rule(&self) -> Result<(), AppError> {
-        let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
-        ipt.delete("nat", "OUTPUT", &self.dns_forwarding_rule())
-            .map_err(|e| AppError::Routing(format!("failed to remove dns forwarding rule | error: {e}")))
-    }
-
     fn remove_socks5_rule(&self) -> Result<(), AppError> {
         let rule = self.socks5_rule();
         let msg = Self::wrap_rule_to_msg(rule, &Action::Delete);
         self.send(msg).map_err(|e| AppError::Routing(format!("failed to remove socks5 rule | error: {e}")))
+    }
+
+    fn remove_dns_forwarding_rule(&self) -> Result<(), AppError> {
+        let ipt = iptables::new(false).map_err(|e| AppError::Routing(e.to_string()))?;
+        if !ipt.exists("nat", "OUTPUT", &self.dns_forwarding_rule()).unwrap_or(false) {
+            return Ok(());
+        }
+        ipt.delete("nat", "OUTPUT", &self.dns_forwarding_rule())
+            .map_err(|e| AppError::Routing(format!("failed to remove dns forwarding rule | error: {e}")))
     }
 
     fn send(&self, mut msg: NetlinkMessage<RouteNetlinkMessage>) -> Result<(), AppError> {
@@ -192,45 +147,6 @@ impl Routing {
             RouteAttribute::Table(TABLE_ID),
             RouteAttribute::Oif(self.tun_index),
             RouteAttribute::Destination(RouteAddress::Inet(Ipv4Addr::UNSPECIFIED))
-        ];
-        route
-    }
-
-    //* 100.64.0.0/10 dev tun0 proto static
-    fn fake_ip_route(&self) -> RouteMessage {
-        let mut route = RouteMessage::default();
-        route.header = RouteHeader {
-            address_family: AddressFamily::Inet,
-            protocol: RouteProtocol::Static,
-            scope: RouteScope::Universe,
-            kind: RouteType::Unicast,
-            destination_prefix_length: FAKE_IP_PREFIX,
-            ..Default::default()
-        };
-        route.attributes = vec![
-            RouteAttribute::Table(TABLE_ID),
-            RouteAttribute::Oif(self.tun_index),
-            RouteAttribute::Destination(RouteAddress::Inet(FAKE_IP_POOL))
-        ];
-        route
-    }
-
-    //* {server_ip}/32 via {default gateway} dev {default interface}
-    fn socks5_route(&self) -> RouteMessage {
-        let mut route = RouteMessage::default();
-        route.header = RouteHeader {
-            address_family: AddressFamily::Inet,
-            protocol: RouteProtocol::Static,
-            scope: RouteScope::Universe,
-            kind: RouteType::Unicast,
-            destination_prefix_length: 32,
-            ..Default::default()
-        };
-
-        route.attributes = vec![
-            RouteAttribute::Oif(self.default_interface_index),
-            RouteAttribute::Destination(RouteAddress::Inet(self.server_address)),
-            RouteAttribute::Gateway(RouteAddress::Inet(self.default_gateway_ip)),
         ];
         route
     }

@@ -1,6 +1,6 @@
 [package]
 name = "s5t"
-version = "0.2.0"
+version = "0.2.1"
 description = "SOCKS5 client with tun2socks and one-time request modes"
 edition.workspace = true
 authors.workspace = true
@@ -39,7 +39,6 @@ hickory-proto = "0.26.1"
 # Network stack (tun2socks)
 netstack-smoltcp = "0.2.4"
 futures-util = "0.3.34"
-default-net = "0.22.0"
 
 [[bin]]
 name = "s5t"

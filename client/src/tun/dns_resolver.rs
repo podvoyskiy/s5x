@@ -2,8 +2,8 @@ use std::{collections::HashMap, net::Ipv4Addr, sync::{Arc, Mutex}};
 use hickory_proto::{op::{Message, MessageType}, rr::{RData, Record, rdata::A}};
 
 use crate::prelude::*;
-use crate::tun::FAKE_IP_POOL;
 
+const FAKE_IP_POOL: Ipv4Addr = Ipv4Addr::new(100, 64, 0, 0);
 const FAKE_IP_START: Ipv4Addr = utils::increment_octet(FAKE_IP_POOL);
 
 

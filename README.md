@@ -71,7 +71,7 @@ curl -x socks5://admin:12345@127.0.0.1:1080 http://httpbin.org/get
 
 Currently supports two modes:
 - **socks5** — One-time SOCKS5 request (HTTP/HTTPS)
-- **tun2socks** — creates a TUN interface and forwards all traffic through a SOCKS5 proxy
+- **tun2socks** — creates a TUN interface and forwards TCP traffic through a SOCKS5 proxy
 
 ### Installation
 
@@ -140,7 +140,7 @@ sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080 --auth admi
 1. Creates a TUN interface with the specified IP
 2. Sets up routing rules to forward all traffic through the TUN
 3. Intercepts DNS requests and returns fake IPs
-4. Forwards all TCP traffic through the SOCKS5 proxy
+4. Forwards **TCP** traffic through the SOCKS5 proxy
 5. Cleanup is automatic on exit (Ctrl+C)
 
 > **Note:** client requires `sudo` to create the TUN interface and modify routing tables

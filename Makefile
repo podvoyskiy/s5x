@@ -23,8 +23,6 @@ AUTH ?= admin:12345
 
 TUN_DEV ?= tun0
 TUN_ADDRESS ?= 10.0.0.9
-GATEWAY ?= $(shell ip route | grep default | awk '{print $$3}' | head -1)
-INTERFACE ?= $(shell ip route | grep default | awk '{print $$5}' | head -1)
 
 TUN_FLAGS = --mode tun2socks --address $(TUN_ADDRESS) --xor $(XOR) --auth $(AUTH) --server $(SERVER)
 
@@ -64,8 +62,7 @@ clean-routes:
 	@echo "Cleaning up routes and rules..."
 	-sudo ip link del $(TUN_DEV) 2>/dev/null || true
 	-sudo ip rule del table 12345 2>/dev/null || true
-	-sudo ip route del $(SERVER)/32 via $(GATEWAY) dev $(INTERFACE) 2>/dev/null || true
-	-sudo ip rule del to $(SERVER) lookup main priority 999 2>/dev/null || true
+	-sudo ip rule del to $(SERVER) lookup main 2>/dev/null || true
 	-sudo iptables -t nat -D OUTPUT -p udp --dport 53 -j DNAT --to-destination $(TUN_ADDRESS):53 2>/dev/null || true
 	@echo "Cleanup completed"
 
