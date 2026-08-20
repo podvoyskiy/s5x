@@ -107,7 +107,7 @@ fn setup_tracing() {
     let filter = EnvFilter::new(directives.join(","));
 
     fmt()
-        .with_target(true)
+        .with_target(false)
         .with_env_filter(filter)
         .init();
 }

@@ -18,6 +18,7 @@
 
 #variables for client with tun2socks mode & `clean-routes` commands
 SERVER ?= 127.0.0.1:1080
+SERVER_IP = $(firstword $(subst :, ,$(SERVER)))
 XOR ?= 0xAA
 AUTH ?= admin:12345
 
@@ -62,7 +63,7 @@ clean-routes:
 	@echo "Cleaning up routes and rules..."
 	-sudo ip link del $(TUN_DEV) 2>/dev/null || true
 	-sudo ip rule del table 12345 2>/dev/null || true
-	-sudo ip rule del to $(SERVER) lookup main 2>/dev/null || true
+	-sudo ip rule del to $(SERVER_IP) lookup main 2>/dev/null || true
 	-sudo iptables -t nat -D OUTPUT -p udp --dport 53 -j DNAT --to-destination $(TUN_ADDRESS):53 2>/dev/null || true
 	@echo "Cleanup completed"
 

@@ -39,7 +39,7 @@ fn setup_tracing() {
     use tracing::Level;
 
     fmt()
-        .with_target(false)
+        .with_target(true)
         .with_max_level(Level::TRACE)
         .init();
 }
