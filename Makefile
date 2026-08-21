@@ -6,7 +6,7 @@
 	client-https \
 	client-xor \
 	client-tun \
-	client-tun-debug \
+	client-tun-nofake \
 	clean-routes \
 	test \
 	test-server \
@@ -16,16 +16,13 @@
 
 -include .env
 
-#variables for client with tun2socks mode & `clean-routes` commands
+#variables used only for client-tun* and clean-routes
 SERVER ?= 127.0.0.1:1080
 SERVER_IP = $(firstword $(subst :, ,$(SERVER)))
-XOR ?= 0xAA
-AUTH ?= admin:12345
-
 TUN_DEV ?= tun0
 TUN_ADDRESS ?= 10.0.0.9
-
-TUN_FLAGS = --mode tun2socks --address $(TUN_ADDRESS) --xor $(XOR) --auth $(AUTH) --server $(SERVER)
+XOR ?= 0xAA
+AUTH ?= admin:12345
 
 # ---------- Server ----------
 server:
@@ -50,11 +47,23 @@ client-xor:
 # ---------- Client with mode tun2socks ----------
 client-tun:
 	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
-	sudo target/x86_64-unknown-linux-musl/release/s5t $(TUN_FLAGS)
+	sudo -E env RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t \
+		--mode tun2socks \
+		--server $(SERVER) \
+		--address $(TUN_ADDRESS) \
+		--xor $(XOR) \
+		--auth $(AUTH)
 
-client-tun-debug:
+client-tun-nofake:
 	cargo build --release --target x86_64-unknown-linux-musl --bin s5t
-	sudo -E env RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t $(TUN_FLAGS)
+	sudo setcap 'CAP_NET_ADMIN+ep' target/x86_64-unknown-linux-musl/release/s5t
+	env RUST_LOG=trace target/x86_64-unknown-linux-musl/release/s5t \
+		--mode tun2socks \
+		--server $(SERVER) \
+		--fakedns false \
+		--address $(TUN_ADDRESS) \
+		--xor $(XOR) \
+		--auth $(AUTH)
 
 # ---------- TUN Routes Management ----------
 # Emergency cleanup if something went wrong
@@ -91,7 +100,7 @@ c:   client
 ch:  client-https
 cx:  client-xor
 ct:  client-tun
-ctd: client-tun-debug
+ctn: client-tun-nofake
 cr:  clean-routes
 t:   test
 ts:  test-server
@@ -105,28 +114,28 @@ help:
 	@echo "Available targets:"
 	@echo ""
 	@echo "Server:"
-	@echo "  server (s)             - Run server"
-	@echo "  server-auth (sa)       - Run server with auth"
-	@echo "  server-xor (sx)        - Run server with XOR"
+	@echo "  server (s)              - Run server"
+	@echo "  server-auth (sa)        - Run server with auth"
+	@echo "  server-xor (sx)         - Run server with XOR"
 	@echo ""
 	@echo "Client:"
-	@echo "  client (c)             - One-time request (HTTP)"
-	@echo "  client-https (ch)      - One-time request (HTTPS)"
-	@echo "  client-xor (cx)        - One-time request with XOR"
-	@echo "  client-tun (ct)        - Run client with mode 'tun2socks'"
-	@echo "  client-tun-debug (ctd) - Run client with trace log"
+	@echo "  client (c)              - One-time request (HTTP)"
+	@echo "  client-https (ch)       - One-time request (HTTPS)"
+	@echo "  client-xor (cx)         - One-time request with XOR"
+	@echo "  client-tun (ct)         - Run client with mode 'tun2socks'"
+	@echo "  client-tun-nofake (ctn) - Run client without using fake dns"
 	@echo ""
 	@echo "TUN routes management:"
-	@echo "  clean-routes (cr)      - Emergency cleanup of routes and rules"
+	@echo "  clean-routes (cr)       - Emergency cleanup of routes and rules"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test (t)               - Run all tests"
-	@echo "  test-server (ts)       - Test server"
-	@echo "  test-client (tc)       - Test client"
-	@echo "  test-lib (tl)          - Test library"
+	@echo "  test (t)                - Run all tests"
+	@echo "  test-server (ts)        - Test server"
+	@echo "  test-client (tc)        - Test client"
+	@echo "  test-lib (tl)           - Test library"
 	@echo ""
 	@echo "Build:"
-	@echo "  build (b)              - Build release binary"
+	@echo "  build (b)               - Build release binary"
 	@echo ""
 	@echo ".env variables or defaults (used only for client-tun* and clean-routes):"
 	@echo "  SERVER      = $(SERVER)"

@@ -13,6 +13,7 @@ pub struct Config {
 
     //Tun mode
     pub address: Ipv4Addr,
+    pub fake_dns: bool,
 
     //Socks5 mode
     pub target: Option<Atyp>,
@@ -36,6 +37,7 @@ impl Debug for Config {
             },
             Mode::Tun2Socks => {
                 s.field("address", &self.address);
+                s.field("fake_dns", &self.fake_dns);
             },
             Mode::Tun => {},
         }
@@ -49,11 +51,12 @@ impl Default for Config  {
             mode: Mode::Socks5, 
             server: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1080),
             address: Ipv4Addr::new(10, 0, 0, 9),
+            fake_dns: true,
             auth: None, 
             target: None, 
             http: Http::default(), 
             use_tls: false,
-            xor: None
+            xor: None,
         }
     }
 }
@@ -84,6 +87,10 @@ impl ConfigTrait for Config {
             //Tun mode
             "--address" => {
                 self.address = value.parse().map_err(|_| AppError::Arguments("invalid tun IP".into()))?;
+                Ok(())
+            }
+            "--fakedns" => {
+                self.fake_dns = bool::from_str(value).map_err(|_| AppError::Arguments("invalid param fakedns (expected true / false)".into()))?;
                 Ok(())
             }
 
@@ -143,7 +150,7 @@ mod test {
 use super::*;
 
     #[test]
-    fn test_valid_args() {
+    fn test_s5_valid_args() {
         let args = vec!["program", "--mode", "s5", "--server", "127.0.0.1:1080", "--target", "https://example.com:8443"];
         let mut config = Config::from_args(args).unwrap();
         assert!(config.validate().is_ok());
@@ -153,7 +160,7 @@ use super::*;
     }
 
     #[test]
-    fn test_valid_args_with_http_headers() {
+    fn test_s5_valid_args_with_http_headers() {
         let args = vec![
             "program", 
             "--mode", "s5", 
@@ -172,10 +179,27 @@ use super::*;
     }
 
     #[test]
-    fn test_https_with_ip() {
+    fn test_s5_https_with_ip() {
         let args = vec!["program", "--mode", "s5", "--server", "127.0.0.1:1080", "--target", "https://34.234.10.121/get"];
         let mut config = Config::from_args(args).unwrap();
         let err = config.validate().unwrap_err();
         assert!(err.to_string().contains("https requires domain name"));
+    }
+
+    #[test]
+    fn test_s5t_valid_args() {
+        let args = vec![
+            "program", 
+            "--mode", "s5t", 
+            "--server", "127.0.0.1:1080", 
+            "--address", "10.0.0.9",
+            "--fakedns", "false",
+        ];
+        let mut config = Config::from_args(args).unwrap();
+        assert!(config.validate().is_ok());
+        assert_eq!(config.mode, Mode::Tun2Socks);
+        assert_eq!(config.server, SocketAddrV4::new(Ipv4Addr::LOCALHOST, 1080));
+        assert_eq!(config.address, Ipv4Addr::new(10, 0, 0, 9));
+        assert_eq!(config.fake_dns, false);
     }
 }

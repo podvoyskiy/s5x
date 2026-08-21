@@ -22,6 +22,7 @@ enum Action {
 pub struct Routing {
     tun_address: Ipv4Addr,
     server_address: Ipv4Addr,
+    fake_dns: bool,
     tun_index: u32,
     socket: Socket,
 }
@@ -34,8 +35,9 @@ impl Routing {
 
         Ok(Self { 
             tun_address: config.address, 
-            server_address: *config.server.ip(), 
-            tun_index, 
+            server_address: *config.server.ip(),
+            fake_dns: config.fake_dns,
+            tun_index,
             socket
         })
     }
@@ -45,7 +47,7 @@ impl Routing {
 
         self.add_default_rule()?;
         self.add_socks5_rule()?;
-        self.add_dns_forwarding_rule()
+        if self.fake_dns { self.add_dns_forwarding_rule() } else { Ok(()) }
     }
 
     pub fn cleanup(&self) -> Result<(), AppError> {
@@ -53,7 +55,7 @@ impl Routing {
 
         self.remove_default_rule()?;
         self.remove_socks5_rule()?;
-        self.remove_dns_forwarding_rule()
+        if self.fake_dns { self.remove_dns_forwarding_rule() } else { Ok(()) }
     }
 
     fn add_default_route(&self) -> Result<(), AppError> {

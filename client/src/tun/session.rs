@@ -13,7 +13,7 @@ use futures_util::{SinkExt, stream::{SplitSink, SplitStream, StreamExt}};
 
 pub struct TunSession {
     config: Config,
-    resolver: DnsResolver,
+    resolver: Option<DnsResolver>,
     cancel_token: CancellationToken,
     dev: Option<AsyncDevice>,
     routing: Routing,
@@ -24,7 +24,7 @@ pub struct TunSession {
 }
 
 impl TunSession {
-    pub fn new(config: Config, resolver: DnsResolver, cancel_token: CancellationToken) -> Result<Self, AppError> {
+    pub fn new(config: Config, resolver: Option<DnsResolver>, cancel_token: CancellationToken) -> Result<Self, AppError> {
         let destination = Ipv4Addr::new(
             config.address.octets()[0], 
             config.address.octets()[1], 
@@ -146,10 +146,14 @@ impl TunSession {
                 let source_port = peer_addr.port();
 
                 if let IpAddr::V4(dest_ip) = dest_ip {
-                    let mut target = format!("{dest_ip}:{dest_port}");
-                    if resolver.is_fake_ip(dest_ip) && let Some(host) = resolver.get_domain_by_fake_ip(dest_ip) {
-                        target = format!("{host}:{dest_port}");
-                    }
+
+                    let target = match resolver.as_ref() {
+                        Some(resolver) if resolver.is_fake_ip(dest_ip) => {
+                            resolver.get_domain_by_fake_ip(dest_ip)
+                                .map_or_else(|| format!("{dest_ip}:{dest_port}"), |host| format!("{host}:{dest_port}"))
+                        },
+                        _ => format!("{dest_ip}:{dest_port}"),
+                    };
 
                     info!("creating tunnel for {source_ip}:{source_port} -> {target}:{dest_port}");
 

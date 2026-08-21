@@ -1,6 +1,6 @@
 [package]
 name = "s5t"
-version = "0.2.1"
+version = "0.2.2"
 description = "SOCKS5 client with tun2socks and one-time request modes"
 edition.workspace = true
 authors.workspace = true
@@ -18,6 +18,8 @@ tracing-subscriber = { workspace = true }
 s5l = { workspace = true }
 
 tokio-util = "0.7.18"
+is_sudo = "0.0.2"
+futures = "0.3.34"
 
 # TLS support for HTTPS
 tokio-rustls = "0.26.4"

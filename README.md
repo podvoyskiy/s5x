@@ -79,6 +79,9 @@ Currently supports two modes:
 
 ```sh
 cargo install s5t
+
+# Optional: allow running without sudo (for tun2socks with --fakedns false)
+sudo setcap 'CAP_NET_ADMIN+ep' ~/.cargo/bin/s5t
 ```
 
 #### Option 2: Prebuilt binary
@@ -87,6 +90,9 @@ Download latest binary `s5t` from [Releases](https://github.com/podvoyskiy/s5x/r
 
 ```sh
 chmod +x ./s5t
+
+# Optional: allow running without sudo (for tun2socks with --fakedns false)
+sudo setcap 'CAP_NET_ADMIN+ep' ./s5t
 ```
 
 ### Usage
@@ -119,33 +125,37 @@ sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080
 
 # With authentication and XOR obfuscation
 sudo s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080 --auth admin:12345 --xor 0xAA
+
+# Run without fake DNS interception (and without sudo if CAP_NET_ADMIN granted)
+s5t --mode tun2socks --address 10.0.0.9 --server 127.0.0.1:1080 --fakedns false
 ```
 > **Note:** If you installed via `cargo install`, `sudo` may not see the binary.  
 > Use the full path: `sudo ~/.cargo/bin/s5t ...`
 
 ### Options
 
-| Option      | Description                       | Mode support |
-| ----------- | --------------------------------- | -------------|
-| `--mode`    | `tun2socks` or `socks5`           | both         |
-| `--server`  | SOCKS5 server address (host:port) | both         |
-| `--auth`    | username:password authentication  | both         |
-| `--xor`     | XOR key for obfuscation (hex)     | both         |
-| `--address` | TUN interface IP                  | `tun2socks`  |
-| `--target`  | target URL                        | `socks5`     |
-| `--method`  | HTTP method (GET, POST, etc.)     | `socks5`     |
-| `--data`    | request body data                 | `socks5`     |
-| `--headers` | custom HTTP headers               | `socks5`     |
+| Option      | Description                       | Mode support | Default          |
+| ----------- | --------------------------------- | -------------| ---------------- |
+| `--mode`    | `tun2socks` or `socks5`           | both         | `socks5`         |
+| `--server`  | SOCKS5 server address (host:port) | both         | `127.0.0.1:1080` |
+| `--auth`    | username:password authentication  | both         | `None`           |
+| `--xor`     | XOR key for obfuscation (hex)     | both         | `None`           |
+| `--address` | TUN interface IP                  | `tun2socks`  | `10.0.0.9`       |
+| `--fakedns` | Enable fake DNS interception      | `tun2socks`  | `true`           |
+| `--target`  | target URL                        | `socks5`     | required         |
+| `--method`  | HTTP method (GET, POST, etc.)     | `socks5`     | `GET`            |
+| `--data`    | request body data                 | `socks5`     | `None`           |
+| `--headers` | custom HTTP headers               | `socks5`     | `None`           |
 
 ### tun2socks: How It Works
 
 1. Creates a TUN interface with the specified IP
 2. Sets up routing rules to forward all traffic through the TUN
-3. Intercepts DNS requests and returns fake IPs
+3. Intercepts DNS requests and returns fake IPs (if `--fakedns true`)
 4. Forwards TCP traffic through the SOCKS5 proxy
 5. Cleanup is automatic on exit (Ctrl+C)
 
-> **Note:** client requires `sudo` to create the TUN interface and modify routing tables
+> **Note:** `sudo` is required to create TUN interface and modify routing tables. With `--fakedns false` granting `CAP_NET_ADMIN` is enough to run without `sudo`
 
 ### Example: Full Setup
 

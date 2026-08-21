@@ -38,38 +38,34 @@ async fn main() -> Result<(), AppError> {
         },
         Mode::Tun2Socks => {
             let cancel_token = CancellationToken::new();
-            let dns_resolver = DnsResolver::new();
+
+            let dns_resolver = if config.fake_dns { Some(DnsResolver::new()) } else { None };
+
+            let mut tasks = Vec::new(); 
 
             let mut session = TunSession::new(config.clone(), dns_resolver.clone(), cancel_token.clone())?;
-            let mut fake_dns = FakeDns::new(&config, dns_resolver.clone(), cancel_token.clone()).await?;
 
-            let mut handle_tun = tokio::spawn(async move {
-                session.run().await;
-            });
+            tasks.push(tokio::spawn(async move { session.run().await; }));
 
-            let mut handle_dns = tokio::spawn(async move {
-                fake_dns.run().await;
-            });
-
+            if let Some(dns_resolver) = dns_resolver {
+                let mut fake_dns = FakeDns::new(&config, dns_resolver.clone(), cancel_token.clone()).await?;
+                tasks.push(tokio::spawn(async move { fake_dns.run().await; }));
+            }
+            
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => {
                     info!("Shutting down...");
                     cancel_token.cancel();
-                    let _ = tokio::join!(handle_tun, handle_dns);
+                    for task in tasks { let _ = task.await; }
                 }
-                result = &mut handle_tun => {
-                    if let Err(error) = result {
-                        error!(%error, "tun crashed");
+                result = async {
+                    futures::future::select_all(&mut tasks).await
+                } => {
+                    if let Err(error) = result.0 {
+                        error!(%error, "task crashed");
                         cancel_token.cancel();
                     }
-                    let _ = handle_dns.await;
-                }
-                result = &mut handle_dns => {
-                    if let Err(error) = result {
-                        error!(%error, "dns crashed");
-                        cancel_token.cancel();
-                    }
-                    let _ = handle_tun.await;
+                    for task in tasks { let _ = task.await; }
                 }
             }
 
